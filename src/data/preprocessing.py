@@ -51,14 +51,23 @@ def get_transforms(
 
 def preprocess_raw_image(
     image: Image.Image,
-    image_size: int = 256
+    image_size: int = 256,
+    pre_resize_size: Optional[int] = None
 ) -> torch.Tensor:
     """
     Convert a PIL image to a (3, H, W) float32 PyTorch tensor in [0.0, 255.0].
+    
+    If pre_resize_size is specified (e.g. 128), the image is first resized to
+    (pre_resize_size, pre_resize_size) via bilinear interpolation, and then
+    resized to (image_size, image_size).
     """
     if image.mode != "RGB":
         image = image.convert("RGB")
     
+    if pre_resize_size is not None and pre_resize_size > 0:
+        pre_transform = T.Resize((pre_resize_size, pre_resize_size), interpolation=T.InterpolationMode.BILINEAR)
+        image = pre_transform(image)
+
     transforms = get_transforms(image_size=image_size, is_training=False)
     resized = transforms(image)
     

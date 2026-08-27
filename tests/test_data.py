@@ -85,3 +85,48 @@ class TestDataModule:
                 split="val",
                 use_mock_data=False,
             )
+
+    def test_pre_resize_preprocessing_disabled_by_default(self):
+        """Verify that preprocessing remains identical when pre_resize_size is None or unset."""
+        from PIL import Image
+        import numpy as np
+
+        np_arr = (np.random.rand(512, 512, 3) * 255).astype(np.uint8)
+        pil_img = Image.fromarray(np_arr)
+
+        out_default = preprocess_raw_image(pil_img, image_size=256)
+        out_none = preprocess_raw_image(pil_img, image_size=256, pre_resize_size=None)
+
+        assert out_default.shape == (3, 256, 256)
+        assert out_none.shape == (3, 256, 256)
+        assert torch.allclose(out_default, out_none)
+
+    def test_pre_resize_preprocessing_enabled(self):
+        """Verify that images are pre-resized to 128x128 and final tensor has shape (3, 256, 256)."""
+        from PIL import Image
+        import numpy as np
+
+        np_arr = (np.random.rand(512, 512, 3) * 255).astype(np.uint8)
+        pil_img = Image.fromarray(np_arr)
+
+        out_pre_resized = preprocess_raw_image(pil_img, image_size=256, pre_resize_size=128)
+
+        # Final tensor must still be (3, 256, 256)
+        assert out_pre_resized.shape == (3, 256, 256)
+        assert isinstance(out_pre_resized, torch.Tensor)
+        assert out_pre_resized.dtype == torch.float32
+
+        # Manually compute expected 512 -> 128 -> 256 transformation
+        img_128 = pil_img.resize((128, 128), Image.BILINEAR)
+        img_256 = img_128.resize((256, 256), Image.BILINEAR)
+        expected_tensor = torch.from_numpy(np.array(img_256, dtype=np.float32)).permute(2, 0, 1)
+
+        assert torch.allclose(out_pre_resized, expected_tensor, atol=1e-3)
+
+    def test_dataset_pre_resize_parameter(self):
+        """Verify GenImageDataset stores and defaults pre_resize_size appropriately."""
+        ds_default = GenImageDataset(root_dir="./data/GenImage", use_mock_data=True)
+        assert ds_default.pre_resize_size is None
+
+        ds_128 = GenImageDataset(root_dir="./data/GenImage", pre_resize_size=128, use_mock_data=True)
+        assert ds_128.pre_resize_size == 128

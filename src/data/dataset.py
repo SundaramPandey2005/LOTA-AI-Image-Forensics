@@ -32,6 +32,7 @@ class GenImageDataset(Dataset):
         generators: Union[str, List[str]] = "sd15",
         split: str = "train",
         image_size: int = 256,
+        pre_resize_size: Optional[int] = None,
         max_samples_per_class: Optional[int] = None,
         extract_forensics_on_the_fly: bool = True,
         bit_planes: Optional[List[int]] = None,
@@ -50,6 +51,7 @@ class GenImageDataset(Dataset):
         self.generators = [generators] if isinstance(generators, str) else list(generators)
         self.split = split
         self.image_size = image_size
+        self.pre_resize_size = pre_resize_size
         self.extract_forensics_on_the_fly = extract_forensics_on_the_fly
         self.bit_planes = bit_planes or bit_indices or [0, 1, 2]
         self.normalization_method = normalization or normalization_method or "thresholding"
@@ -145,7 +147,11 @@ class GenImageDataset(Dataset):
                 raise FileNotFoundError(f"Image file '{file_path}' does not exist.")
             try:
                 pil_img = Image.open(file_path).convert("RGB")
-                raw_tensor = preprocess_raw_image(pil_img, image_size=self.image_size)
+                raw_tensor = preprocess_raw_image(
+                    pil_img,
+                    image_size=self.image_size,
+                    pre_resize_size=self.pre_resize_size
+                )
             except Exception as e:
                 raise RuntimeError(f"Corrupt or unreadable image file '{file_path}': {e}")
 

@@ -77,6 +77,7 @@ def run_real_data_pilot(
         require_exact = cfg["data"].get("require_exact_sample_counts", False)
         req_real = cfg["data"].get("max_real_samples", None)
         req_fake = cfg["data"].get("max_fake_samples", None)
+        pre_resize = cfg["data"].get("pre_resize_size", None)
 
         if train_exists and val_exists:
             train_ds = GenImageDataset(
@@ -84,6 +85,7 @@ def run_real_data_pilot(
                 generators=[gen_name],
                 split="train",
                 max_samples_per_class=req_real,
+                pre_resize_size=pre_resize,
                 use_mock_data=False
             )
             val_ds = GenImageDataset(
@@ -91,6 +93,7 @@ def run_real_data_pilot(
                 generators=[gen_name],
                 split="val",
                 max_samples_per_class=cfg["data"].get("max_val_samples", req_real),
+                pre_resize_size=pre_resize,
                 use_mock_data=False
             )
             total_real_samples = sum(1 for s in train_ds.samples if s[1] == 0) + sum(1 for s in val_ds.samples if s[1] == 0)
@@ -102,6 +105,7 @@ def run_real_data_pilot(
                 root_dir=dataset_root,
                 generators=[gen_name],
                 split=active_split,
+                pre_resize_size=pre_resize,
                 use_mock_data=False
             )
             total_real_samples = sum(1 for s in base_ds.samples if s[1] == 0)
@@ -153,12 +157,14 @@ def run_real_data_pilot(
                 root_dir=dataset_root,
                 generators=[gen_name],
                 samples=train_samples,
+                pre_resize_size=pre_resize,
                 use_mock_data=False
             )
             val_ds = GenImageDataset(
                 root_dir=dataset_root,
                 generators=[gen_name],
                 samples=val_samples,
+                pre_resize_size=pre_resize,
                 use_mock_data=False
             )
 
@@ -192,6 +198,8 @@ def run_real_data_pilot(
     print(f"  Real Val Samples     : {sum(1 for s in val_ds.samples if s[1] == 0)}")
     print(f"  Fake Val Samples     : {sum(1 for s in val_ds.samples if s[1] == 1)}")
     print(f"  Image Size           : 256x256 (MGPS 32x32 Patch)")
+    if pre_resize:
+        print(f"  Pre-Resize Size      : {pre_resize}x{pre_resize} (Bilinear)")
     print(f"  Batch Size           : {batch_size}")
     print(f"  Compute Device       : {device} (AMP: {amp_enabled})")
 
