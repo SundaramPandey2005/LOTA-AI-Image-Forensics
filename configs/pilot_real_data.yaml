@@ -1,0 +1,31 @@
+# LOTA Real-Data Pilot Configuration (Gate B)
+experiment_name: "real_data_pilot_sd15"
+generator: "sd15"
+
+data:
+  root_dir: "./data/GenImage"
+  use_mock_data: false
+  max_real_samples: 100
+  max_fake_samples: 100
+  image_size: 256
+  patch_size: 32
+  bit_planes: [0, 1, 2]
+  normalization: "thresholding"
+
+model:
+  architecture: "nbc"
+  backbone: "resnet50"
+  pretrained: true
+  num_classes: 1
+
+training:
+  batch_size: 16
+  epochs: 3
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  mixed_precision: true
+  checkpoint_dir: "./checkpoints"
+
+reproducibility:
+  seed: 42
+  deterministic: true

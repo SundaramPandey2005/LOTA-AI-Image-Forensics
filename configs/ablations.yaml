@@ -1,0 +1,37 @@
+# Focused Ablations Specification
+
+ablation_1_bit_planes:
+  baseline_train_generator: "sd_v15"
+  variants:
+    - name: "bit_0"
+      bit_planes: [0]
+    - name: "bit_0_1"
+      bit_planes: [0, 1]
+    - name: "bit_0_2"
+      bit_planes: [0, 1, 2] # LOTA default
+    - name: "bit_0_3"
+      bit_planes: [0, 1, 2, 3]
+    - name: "bit_0_4"
+      bit_planes: [0, 1, 2, 3, 4]
+    - name: "bit_0_5"
+      bit_planes: [0, 1, 2, 3, 4, 5]
+
+ablation_2_mgps:
+  baseline_train_generator: "sd_v15"
+  strategies:
+    - name: "max_gradient" # LOTA default
+    - name: "random"
+    - name: "min_gradient"
+    - name: "center"
+  patch_sizes:
+    - 16
+    - 32 # LOTA default
+    - 48
+    - 64
+
+ablation_3_classifiers:
+  baseline_train_generator: "sd_v15"
+  architectures:
+    - name: "nbc" # Noise-Based Classifier (ResNet-50)
+    - name: "ngc" # Noise-Guided Classifier (Cross-Attention)
+    - name: "linear_fc" # Direct FC on noise map

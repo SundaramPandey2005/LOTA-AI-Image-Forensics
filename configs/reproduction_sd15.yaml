@@ -1,0 +1,35 @@
+# Baseline Reproduction on Stable Diffusion v1.5 Subset
+
+experiment_name: "reproduction_sd15_baseline"
+seed: 42
+
+dataset:
+  train_generators: ["sd_v15"]
+  images_per_generator: 5000
+  image_size: 256
+  train_val_split: 0.8
+  num_workers: 4
+
+forensic:
+  bit_planes: [0, 1, 2]
+  normalization: "thresholding"
+  patch_size: 32
+  patch_selection: "max_gradient"
+
+model:
+  architecture: "nbc"
+  backbone: "resnet50"
+  pretrained: true
+  num_classes: 1
+
+training:
+  batch_size: 64
+  epochs: 30
+  learning_rate: 0.0001
+  optimizer: "adam"
+  scheduler: "cosine"
+  mixed_precision: true
+  early_stopping_patience: 5
+
+logging:
+  database_path: "./experiments/results/lota_experiments.db"

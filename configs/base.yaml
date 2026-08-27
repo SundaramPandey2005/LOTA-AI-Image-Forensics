@@ -1,0 +1,42 @@
+# Base Configuration for LOTA Experiments
+
+seed: 42
+deterministic: false
+
+dataset:
+  name: "GenImage"
+  root_dir: "./data/GenImage"
+  image_size: 256
+  train_val_split: 0.8
+  num_workers: 4
+  pin_memory: true
+
+forensic:
+  bit_planes: [0, 1, 2] # 3 lowest-order bit-planes (k=0,1,2)
+  normalization: "thresholding" # "thresholding" (default) or "scaling"
+  patch_size: 32 # 32x32 patch size
+  patch_selection: "max_gradient" # "max_gradient", "random", "min_gradient", "center"
+
+model:
+  architecture: "nbc" # "nbc" (Noise-Based) or "ngc" (Noise-Guided)
+  backbone: "resnet50"
+  pretrained: true
+  num_classes: 1 # Binary classification (Real=0, AI-Generated=1)
+
+training:
+  batch_size: 64
+  epochs: 30
+  learning_rate: 0.0001
+  weight_decay: 0.00001
+  optimizer: "adam"
+  scheduler: "cosine"
+  mixed_precision: true
+  early_stopping_patience: 5
+  save_best_only: true
+  checkpoint_dir: "./checkpoints"
+
+logging:
+  use_wandb: false
+  project_name: "DLCV-LOTA-Forensics"
+  log_interval: 50
+  database_path: "./experiments/results/lota_experiments.db"

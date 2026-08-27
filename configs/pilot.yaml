@@ -1,0 +1,36 @@
+# Pilot Experiment Configuration (Rapid Pre-Flight Feasibility Check)
+
+experiment_name: "pilot_feasibility_check"
+seed: 42
+deterministic: false
+
+dataset:
+  name: "GenImage-Mini"
+  train_generators: ["sd_v15", "biggan"]
+  images_per_generator: 500
+  image_size: 256
+  train_val_split: 0.8
+  num_workers: 2
+
+forensic:
+  bit_planes: [0, 1, 2]
+  normalization: "thresholding"
+  patch_size: 32
+  patch_selection: "max_gradient"
+
+model:
+  architecture: "nbc"
+  backbone: "resnet50"
+  pretrained: true
+  num_classes: 1
+
+training:
+  batch_size: 32
+  epochs: 3
+  learning_rate: 0.0001
+  optimizer: "adam"
+  mixed_precision: true
+
+logging:
+  use_wandb: false
+  database_path: "./experiments/results/lota_experiments.db"

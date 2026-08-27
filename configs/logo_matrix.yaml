@@ -1,0 +1,39 @@
+# 4-Generator Leave-One-Generator-Out (LOGO) Experiment Specifications
+
+generators:
+  archetypes:
+    - name: "biggan"
+      family: "GAN"
+      description: "Heterologous GAN archetype"
+    - name: "sd_v14"
+      family: "Latent Diffusion"
+      description: "Latent Diffusion archetype"
+    - name: "midjourney"
+      family: "Proprietary Diffusion"
+      description: "High-fidelity proprietary stress case"
+    - name: "glide"
+      family: "Guided Diffusion"
+      description: "Architecturally distinct diffusion model"
+
+rotations:
+  - id: "LOGO_R1_HELD_OUT_BIGGAN"
+    train_generators: ["sd_v14", "midjourney", "glide"]
+    excluded_generator: "biggan"
+    description: "Train on 3 diffusion models; evaluate cross-architecture transfer to GAN"
+
+  - id: "LOGO_R2_HELD_OUT_SD14"
+    train_generators: ["biggan", "midjourney", "glide"]
+    excluded_generator: "sd_v14"
+    description: "Train on GAN + proprietary + guided diffusion; test on latent diffusion"
+
+  - id: "LOGO_R3_HELD_OUT_MIDJOURNEY"
+    train_generators: ["biggan", "sd_v14", "glide"]
+    excluded_generator: "midjourney"
+    description: "Train on open GAN/diffusion; test on high-fidelity proprietary generator"
+
+  - id: "LOGO_R4_HELD_OUT_GLIDE"
+    train_generators: ["biggan", "sd_v14", "midjourney"]
+    excluded_generator: "glide"
+    description: "Train on GAN + Latent + Proprietary; test on guided diffusion"
+
+evaluation_targets: ["biggan", "midjourney", "wukong", "sd_v14", "sd_v15", "adm", "glide", "vqdm"]

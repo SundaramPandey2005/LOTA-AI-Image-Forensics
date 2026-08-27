@@ -1,0 +1,16 @@
+# Real-World Image Degradation Robustness Benchmark Specifications
+
+robustness_suite:
+  jpeg_compression:
+    quality_levels: [100, 95, 90, 85, 80, 70, 50]
+    description: "Evaluates degradation under lossy discrete cosine transform quantization"
+  
+  gaussian_blur:
+    sigma_levels: [0.0, 0.5, 1.0, 1.5, 2.0, 3.0]
+    kernel_size: 5
+    description: "Evaluates detector sensitivity to high-frequency spatial smoothing"
+
+  downsampling:
+    scales: [1.0, 0.75, 0.5, 0.25]
+    interpolation: "bilinear"
+    description: "Evaluates resilience against image downscaling / resolution reduction"
