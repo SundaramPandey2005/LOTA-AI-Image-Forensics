@@ -22,6 +22,7 @@ class ExperimentLogger:
         excluded_generator: Optional[str] = None,
         source_type: str = "experimental",
         is_mock: bool = False,
+        split: str = "test",
         exp_id: Optional[str] = None,
         model_info: Optional[Dict[str, Any]] = None,
         eval_metrics: Optional[Dict[str, Dict[str, float]]] = None,
@@ -78,7 +79,7 @@ class ExperimentLogger:
             self.db.insert_metrics(
                 experiment_id=final_exp_id,
                 generator_id=gen_name,
-                split="test",
+                split=split,
                 source_type=source_type,
                 is_mock=is_mock,
                 metrics=metrics,
