@@ -3,6 +3,7 @@ import torch
 
 from src.models.nbc import NoiseBasedClassifier
 from src.models.ngc import NoiseGuidedClassifier
+from src.models.raw import RawImageClassifier
 from src.models import create_model
 
 
@@ -46,6 +47,25 @@ class TestModels:
         assert model.classifier.weight.grad is not None
         assert model.classifier.weight.grad.norm().item() > 0
 
+    def test_raw_image_forward_and_backward(self):
+        # RawImageClassifier without pretrained weights for fast testing
+        model = RawImageClassifier(backbone_name="resnet18", pretrained=False, num_classes=1)
+        model.train()
+
+        B = 2
+        raw_image = torch.rand((B, 3, 256, 256), dtype=torch.float32) * 255.0
+        labels = torch.tensor([0.0, 1.0], dtype=torch.float32)
+
+        logits = model(raw_image)
+        assert logits.shape == (B,)
+
+        loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, labels)
+        loss.backward()
+
+        # Check gradients exist on classifier head
+        assert model.fc.weight.grad is not None
+        assert model.fc.weight.grad.norm().item() > 0
+
     def test_create_model_factory(self):
         cfg_nbc = {"model": {"architecture": "nbc", "backbone": "resnet18", "pretrained": False}}
         m_nbc = create_model(cfg_nbc)
@@ -54,3 +74,7 @@ class TestModels:
         cfg_ngc = {"model": {"architecture": "ngc", "backbone": "resnet18", "pretrained": False}}
         m_ngc = create_model(cfg_ngc)
         assert isinstance(m_ngc, NoiseGuidedClassifier)
+
+        cfg_raw = {"model": {"architecture": "raw_only", "backbone": "resnet18", "pretrained": False}}
+        m_raw = create_model(cfg_raw)
+        assert isinstance(m_raw, RawImageClassifier)

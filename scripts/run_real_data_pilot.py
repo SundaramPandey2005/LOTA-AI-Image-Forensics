@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 
 from src.data.dataset import GenImageDataset
 from src.data.splits import create_stratified_split
-from src.models import create_model, NoiseBasedClassifier, NoiseGuidedClassifier
+from src.models import create_model, NoiseBasedClassifier, NoiseGuidedClassifier, RawImageClassifier
 from src.experiments.database import ExperimentDatabase
 from src.experiments.logger import ExperimentLogger
 from src.training.metrics import compute_classification_metrics
@@ -195,7 +195,7 @@ def run_real_data_pilot(
     print(f"  Batch Size           : {batch_size}")
     print(f"  Compute Device       : {device} (AMP: {amp_enabled})")
 
-    # 3. Model Initialization (Configuration-Driven: NBC vs NGC)
+    # 3. Model Initialization (Configuration-Driven: NBC vs NGC vs RAW_ONLY)
     arch_name = str(cfg.get("model", {}).get("architecture", "nbc")).lower()
     backbone_name = str(cfg.get("model", {}).get("backbone", "resnet50"))
     pretrained = bool(cfg.get("model", {}).get("pretrained", True))
@@ -207,8 +207,11 @@ def run_real_data_pilot(
     elif arch_name == "ngc":
         model = NoiseGuidedClassifier(backbone=backbone_name, pretrained=pretrained, num_classes=num_classes)
         model_id = f"M_NGC_{backbone_name.upper()}"
+    elif arch_name in ("raw_only", "raw", "raw_image"):
+        model = RawImageClassifier(backbone=backbone_name, pretrained=pretrained, num_classes=num_classes)
+        model_id = f"M_RAW_{backbone_name.upper()}"
     else:
-        raise ValueError(f"Unknown model architecture: '{arch_name}'. Supported architectures are 'nbc' and 'ngc'.")
+        raise ValueError(f"Unknown model architecture: '{arch_name}'. Supported architectures are 'nbc', 'ngc', and 'raw_only'.")
 
     model.to(device)
 
@@ -262,6 +265,8 @@ def run_real_data_pilot(
             with torch.cuda.amp.autocast(enabled=amp_enabled):
                 if arch_name == "ngc":
                     logits = model(noise_patch=patches, raw_image=raw_images).view(-1)
+                elif arch_name in ("raw_only", "raw", "raw_image"):
+                    logits = model(raw_image=raw_images).view(-1)
                 else:
                     logits = model(noise_patch=patches).view(-1)
                 loss = criterion(logits, labels)
@@ -288,6 +293,8 @@ def run_real_data_pilot(
                 with torch.cuda.amp.autocast(enabled=amp_enabled):
                     if arch_name == "ngc":
                         logits = model(noise_patch=patches, raw_image=raw_images).view(-1)
+                    elif arch_name in ("raw_only", "raw", "raw_image"):
+                        logits = model(raw_image=raw_images).view(-1)
                     else:
                         logits = model(noise_patch=patches).view(-1)
                     loss = criterion(logits, labels)
@@ -377,7 +384,9 @@ def run_real_data_pilot(
     }
 
     # Resolve human-readable experiment name
-    if "e2" in exp_id.lower():
+    if "sanity" in exp_id.lower() or "raw" in exp_id.lower():
+        exp_display_name = f"E2 BigGAN Raw-Only Sanity Baseline"
+    elif "e2" in exp_id.lower():
         exp_display_name = f"E2 BigGAN NGC Baseline"
     elif "e1" in exp_id.lower():
         exp_display_name = f"E1 BigGAN Constrained Baseline"

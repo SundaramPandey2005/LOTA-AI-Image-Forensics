@@ -1,6 +1,7 @@
 from .backbones import get_backbone
 from .nbc import NoiseBasedClassifier, LOTANoiseClassifier
 from .ngc import NoiseGuidedClassifier
+from .raw import RawImageClassifier, RawOnlyClassifier
 
 
 def create_model(config: dict):
@@ -24,8 +25,14 @@ def create_model(config: dict):
             pretrained=pretrained,
             num_classes=num_classes
         )
+    elif arch in ("raw_only", "raw", "raw_image"):
+        return RawImageClassifier(
+            backbone_name=backbone_name,
+            pretrained=pretrained,
+            num_classes=num_classes
+        )
     else:
-        raise ValueError(f"Unknown model architecture: '{arch}'. Choose 'nbc' or 'ngc'.")
+        raise ValueError(f"Unknown model architecture: '{arch}'. Choose 'nbc', 'ngc', or 'raw_only'.")
 
 
 __all__ = [
@@ -33,5 +40,7 @@ __all__ = [
     "NoiseBasedClassifier",
     "LOTANoiseClassifier",
     "NoiseGuidedClassifier",
+    "RawImageClassifier",
+    "RawOnlyClassifier",
     "create_model",
 ]
