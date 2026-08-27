@@ -201,4 +201,49 @@ class TestExperimentDatabaseAndQueries:
         with pytest.raises(ValueError):
             parse_e1_summary_file(corrupt_file)
 
+    def test_zero_shot_cross_gen_evaluation_mock(self):
+        """Verify that zero_shot_cross_gen_eval runs end-to-end and returns expected structure."""
+        import tempfile
+        import torch
+        from scripts.zero_shot_cross_gen_eval import run_cross_generator_evaluations
+        from src.models import create_model
+        from src.utils.config_parser import load_config
+
+        temp_dir = tempfile.mkdtemp()
+        mock_e1_ckpt = os.path.join(temp_dir, "mock_e1.pth")
+        mock_e3_ckpt = os.path.join(temp_dir, "mock_e3.pth")
+
+        cfg_e1 = load_config("./configs/biggan_constrained_baseline_e1.yaml")
+        cfg_e3 = load_config("./configs/vqdm_e3_baseline.yaml")
+
+        model_e1 = create_model(cfg_e1)
+        model_e3 = create_model(cfg_e3)
+
+        torch.save({"model_state_dict": model_e1.state_dict()}, mock_e1_ckpt)
+        torch.save({"model_state_dict": model_e3.state_dict()}, mock_e3_ckpt)
+
+        device = torch.device("cpu")
+        res = run_cross_generator_evaluations(
+            e1_config="./configs/biggan_constrained_baseline_e1.yaml",
+            e1_checkpoint=mock_e1_ckpt,
+            e3_config="./configs/vqdm_e3_baseline.yaml",
+            e3_checkpoint=mock_e3_ckpt,
+            device=device,
+            use_mock=True
+        )
+
+        assert "e1_to_vqdm" in res
+        assert "e3_to_biggan" in res
+
+        for key in ("e1_to_vqdm", "e3_to_biggan"):
+            r = res[key]
+            assert "metrics" in r
+            assert "accuracy" in r["metrics"]
+            assert "auroc" in r["metrics"]
+            assert "average_precision" in r["metrics"]
+            assert "f1" in r["metrics"]
+            assert 0.0 <= r["metrics"]["accuracy"] <= 1.0
+            assert 0.0 <= r["metrics"]["auroc"] <= 1.0
+
+
 
