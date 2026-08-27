@@ -1,0 +1,91 @@
+
+============================================================
+LOTA AI IMAGE FORENSICS
+EXPERIMENT E1 — BIGGAN CONSTRAINED BASELINE
+============================================================
+
+Experiment ID:
+biggan_constrained_baseline_e1
+
+Dataset:
+Generator: BigGAN
+
+Training Samples:
+500 AI-generated images
+500 Real/Nature images
+
+Training Configuration:
+Epochs: 15
+Batch Size: 16
+Optimizer: Adam
+Learning Rate: 0.0001
+Weight Decay: 0.0001
+Backbone: ResNet50
+Architecture: NBC / LOTA Noise Classifier
+Image Size: 256x256
+Seed: 42
+
+------------------------------------------------------------
+BEST MODEL RESULTS
+------------------------------------------------------------
+
+Best Epoch: 14
+
+Validation Accuracy:
+0.8700
+
+Validation AUROC:
+0.94565
+
+Average Precision:
+0.922818
+
+F1 Score:
+0.879630
+
+Precision:
+0.818966
+
+Recall:
+0.950000
+
+Train Loss:
+0.049934
+
+Validation Loss:
+0.426662
+
+------------------------------------------------------------
+FINAL EPOCH RESULTS
+------------------------------------------------------------
+
+Final Epoch: 15
+
+Validation Accuracy:
+0.8550
+
+Validation AUROC:
+0.94110
+
+Average Precision:
+0.931144
+
+F1 Score:
+0.851282
+
+Precision:
+0.873684
+
+Recall:
+0.830000
+
+------------------------------------------------------------
+EXPERIMENT STATUS
+------------------------------------------------------------
+
+Status: COMPLETED
+Source Type: experimental
+Mock Data: False
+Training Time: approximately 356.45 seconds
+
+============================================================
