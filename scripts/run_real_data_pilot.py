@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 
 from src.data.dataset import GenImageDataset
 from src.data.splits import create_stratified_split
-from src.models.nbc import LOTANoiseClassifier
+from src.models import create_model, NoiseBasedClassifier, NoiseGuidedClassifier
 from src.experiments.database import ExperimentDatabase
 from src.experiments.logger import ExperimentLogger
 from src.training.metrics import compute_classification_metrics
@@ -195,8 +195,21 @@ def run_real_data_pilot(
     print(f"  Batch Size           : {batch_size}")
     print(f"  Compute Device       : {device} (AMP: {amp_enabled})")
 
-    # 3. Model Initialization
-    model = LOTANoiseClassifier(backbone=cfg.get("model", {}).get("backbone", "resnet50"), pretrained=cfg.get("model", {}).get("pretrained", True), num_classes=1)
+    # 3. Model Initialization (Configuration-Driven: NBC vs NGC)
+    arch_name = str(cfg.get("model", {}).get("architecture", "nbc")).lower()
+    backbone_name = str(cfg.get("model", {}).get("backbone", "resnet50"))
+    pretrained = bool(cfg.get("model", {}).get("pretrained", True))
+    num_classes = int(cfg.get("model", {}).get("num_classes", 1))
+
+    if arch_name == "nbc":
+        model = NoiseBasedClassifier(backbone=backbone_name, pretrained=pretrained, num_classes=num_classes)
+        model_id = f"M_NBC_{backbone_name.upper()}"
+    elif arch_name == "ngc":
+        model = NoiseGuidedClassifier(backbone=backbone_name, pretrained=pretrained, num_classes=num_classes)
+        model_id = f"M_NGC_{backbone_name.upper()}"
+    else:
+        raise ValueError(f"Unknown model architecture: '{arch_name}'. Supported architectures are 'nbc' and 'ngc'.")
+
     model.to(device)
 
     # 4. Configurable Optimizer Selection
@@ -213,6 +226,9 @@ def run_real_data_pilot(
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
 
+    print(f"  Architecture         : {arch_name.upper()} ({model.__class__.__name__})")
+    print(f"  Backbone             : {backbone_name} (pretrained={pretrained})")
+    print(f"  Model Identifier     : {model_id}")
     print(f"  Optimizer            : {opt_name.upper()} (lr={lr}, weight_decay={wd})")
 
     criterion = nn.BCEWithLogitsLoss()
@@ -231,7 +247,7 @@ def run_real_data_pilot(
     total_images_processed = 0
     t_start = time.time()
 
-    print(f"\n[START TRAINING] Executing {epochs} epochs on real GenImage samples...")
+    print(f"\n[START TRAINING] Executing {epochs} epochs on real GenImage samples ({arch_name.upper()})...")
     for epoch in range(1, epochs + 1):
         t_epoch_start = time.time()
         model.train()
@@ -239,11 +255,15 @@ def run_real_data_pilot(
 
         for batch in train_loader:
             patches = batch["noise_patch"].to(device)
+            raw_images = batch["raw_image"].to(device) if "raw_image" in batch else None
             labels = batch["label"].to(device).float()
 
             optimizer.zero_grad()
             with torch.cuda.amp.autocast(enabled=amp_enabled):
-                logits = model(patches).view(-1)
+                if arch_name == "ngc":
+                    logits = model(noise_patch=patches, raw_image=raw_images).view(-1)
+                else:
+                    logits = model(noise_patch=patches).view(-1)
                 loss = criterion(logits, labels)
 
             scaler.scale(loss).backward()
@@ -263,9 +283,13 @@ def run_real_data_pilot(
         with torch.no_grad():
             for batch in val_loader:
                 patches = batch["noise_patch"].to(device)
+                raw_images = batch["raw_image"].to(device) if "raw_image" in batch else None
                 labels = batch["label"].to(device).float()
                 with torch.cuda.amp.autocast(enabled=amp_enabled):
-                    logits = model(patches).view(-1)
+                    if arch_name == "ngc":
+                        logits = model(noise_patch=patches, raw_image=raw_images).view(-1)
+                    else:
+                        logits = model(noise_patch=patches).view(-1)
                     loss = criterion(logits, labels)
                 val_loss += loss.item() * len(labels)
                 probs = torch.sigmoid(logits).cpu().numpy().flatten()
@@ -304,6 +328,8 @@ def run_real_data_pilot(
                 "epoch": epoch,
                 "best_epoch": epoch,
                 "experiment_id": exp_id,
+                "architecture": arch_name,
+                "model_id": model_id,
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
                 "val_metrics": epoch_metrics,
@@ -323,6 +349,8 @@ def run_real_data_pilot(
     print("  EXPERIMENT MEASUREMENTS & SUMMARY")
     print("=" * 75)
     print(f"  Experiment ID          : {exp_id}")
+    print(f"  Architecture           : {arch_name.upper()}")
+    print(f"  Model ID               : {model_id}")
     print(f"  Total Images Processed : {total_images_processed}")
     print(f"  Total Duration         : {total_duration:.2f}s")
     print(f"  Training Throughput    : {throughput:.2f} images/sec")
@@ -348,19 +376,27 @@ def run_real_data_pilot(
         "epoch_history": epoch_history
     }
 
+    # Resolve human-readable experiment name
+    if "e2" in exp_id.lower():
+        exp_display_name = f"E2 BigGAN NGC Baseline"
+    elif "e1" in exp_id.lower():
+        exp_display_name = f"E1 BigGAN Constrained Baseline"
+    else:
+        exp_display_name = f"Real-Data {gen_name.upper()} {arch_name.upper()} Pilot"
+
     # Log to database as experimental (Recording Best Metrics under split='val_best')
     logger = ExperimentLogger(db_path)
     logger.log_run(
         experiment_id=exp_id,
-        name=f"E1 BigGAN Constrained Baseline" if "e1" in exp_id.lower() else f"Real-Data {gen_name.upper()} Pilot",
+        name=exp_display_name,
         config=resolved_cfg,
-        model_id="M_NBC_RESNET50",
+        model_id=model_id,
         metrics_by_generator={gen_name: final_logged_metrics},
         split="val_best",
         source_type="experimental",
         is_mock=False,
         training_time_sec=total_duration,
-        notes=f"Best epoch: {best_epoch}/{epochs} | Best Val AUROC: {final_logged_metrics['auroc']:.4f} | Final Val AUROC: {final_epoch_metrics['auroc']:.4f}"
+        notes=f"Arch: {arch_name.upper()} | Best epoch: {best_epoch}/{epochs} | Best Val AUROC: {final_logged_metrics['auroc']:.4f} | Final Val AUROC: {final_epoch_metrics['auroc']:.4f}"
     )
 
     # Record final epoch metrics under split='val_final' to clearly distinguish best vs final
