@@ -27,6 +27,24 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Warn viewers if the database currently contains only illustrative/demo data
+_demo_check_db = ExperimentDatabase("./experiments/results/lota_experiments.db")
+try:
+    _real_exp_df = _demo_check_db.query_df(
+        "SELECT COUNT(*) as count FROM experiments WHERE is_mock = 0 AND experiment_id NOT LIKE 'DEMO_ONLY_%'"
+    )
+    _real_exp_count = _real_exp_df.iloc[0]["count"] if len(_real_exp_df) > 0 else 0
+except Exception:
+    _real_exp_count = 0
+
+if _real_exp_count == 0:
+    st.warning(
+        "⚠️ No real experiments have been run yet in this database. "
+        "All numbers currently shown are SYNTHETIC DEMO DATA for UI "
+        "illustration only, and do not reflect this project's actual results.",
+        icon="⚠️"
+    )
+
 # Custom Styling
 st.markdown("""
 <style>
@@ -51,7 +69,17 @@ def get_query_engine(db_path: str = "./experiments/results/lota_experiments.db")
 
 
 def _seed_demo_experiments(db: ExperimentDatabase):
-    """Seed published ICCV 2025 LOTA benchmark data for immediate exploration."""
+    """
+    Seed ILLUSTRATIVE/SYNTHETIC demo data so the app has something to display
+    when the database is empty (e.g. on first run / fresh clone).
+
+    THESE ARE NOT REAL EXPERIMENTAL RESULTS. They are inspired by the paper's
+    published figures purely so the UI has plausible-looking numbers to render
+    before you have run your own experiments. They must be logged as
+    source_type='mock_fixture', is_mock=True so they are never confused with,
+    or mixed into queries/comparisons against, this project's genuine
+    experimental results (E1, zero-shot cross-generator eval, etc.).
+    """
     from src.experiments.logger import ExperimentLogger
     logger = ExperimentLogger(db.db_path)
 
@@ -83,13 +111,16 @@ def _seed_demo_experiments(db: ExperimentDatabase):
         }
     }
     logger.log_run(
-        experiment_id="EXP_LOTA_SD15_REPRO",
-        name="LOTA NBC Trained on SD v1.5",
+        experiment_id="DEMO_ONLY_LOTA_SD15_ILLUSTRATIVE",
+        name="[DEMO/SYNTHETIC] Illustrative NBC numbers (not a real run)",
         config={"model": {"architecture": "nbc", "backbone": "resnet50"}, "forensic": {"bit_planes": [0, 1, 2], "normalization": "thresholding", "patch_size": 32}},
         model_id="M_NBC_RESNET50",
         metrics_by_generator=metrics_sd15,
         robustness_results=robust_sd15,
-        training_time_sec=1420.0
+        training_time_sec=1420.0,
+        source_type="mock_fixture",
+        is_mock=True,
+        notes="SYNTHETIC DEMO DATA ONLY -- illustrative numbers inspired by the published paper, not a result this project actually produced. Do not cite."
     )
 
     # 2. LOGO Rotation: Exclude Midjourney
@@ -100,13 +131,16 @@ def _seed_demo_experiments(db: ExperimentDatabase):
         "adm": {"accuracy": 0.981, "auroc": 0.988, "average_precision": 0.985, "f1": 0.979}
     }
     logger.log_run(
-        experiment_id="EXP_LOGO_EXCL_MIDJOURNEY",
-        name="LOGO Exclude Midjourney (Trained on BigGAN+SD14+ADM)",
+        experiment_id="DEMO_ONLY_LOGO_ILLUSTRATIVE",
+        name="[DEMO/SYNTHETIC] Illustrative LOGO Exclude Midjourney (not a real run)",
         config={"model": {"architecture": "nbc"}},
         model_id="M_NBC_RESNET50",
         metrics_by_generator=metrics_logo_mj,
         excluded_generator="midjourney",
-        training_time_sec=1850.0
+        training_time_sec=1850.0,
+        source_type="mock_fixture",
+        is_mock=True,
+        notes="SYNTHETIC DEMO DATA ONLY -- illustrative numbers inspired by the published paper, not a result this project actually produced. Do not cite."
     )
 
     # 3. NGC Noise-Guided Classifier
@@ -117,12 +151,15 @@ def _seed_demo_experiments(db: ExperimentDatabase):
         "adm": {"accuracy": 0.991, "auroc": 0.996, "average_precision": 0.994, "f1": 0.989}
     }
     logger.log_run(
-        experiment_id="EXP_NGC_DUAL_STREAM",
-        name="LOTA NGC Dual-Stream Guided Classifier",
+        experiment_id="DEMO_ONLY_NGC_ILLUSTRATIVE",
+        name="[DEMO/SYNTHETIC] Illustrative NGC Dual-Stream Guided Classifier (not a real run)",
         config={"model": {"architecture": "ngc", "backbone": "resnet50"}},
         model_id="M_NGC_RESNET50",
         metrics_by_generator=metrics_ngc,
-        training_time_sec=2100.0
+        training_time_sec=2100.0,
+        source_type="mock_fixture",
+        is_mock=True,
+        notes="SYNTHETIC DEMO DATA ONLY -- illustrative numbers inspired by the published paper, not a result this project actually produced. Do not cite."
     )
 
 

@@ -1,0 +1,36 @@
+# E2 — BigGAN Resolution & Encoding Matched (128x128 -> JPEG Q95 -> 256x256) Sanity Baseline (Architecture Comparison)
+experiment_name: "biggan_resolution_encoding_matched_sanity_raw_only"
+generator: "biggan"
+
+data:
+  root_dir: "./data/GenImage"
+  use_mock_data: false
+  require_exact_sample_counts: true
+  train_val_ratio: 0.7
+  max_real_samples: 500
+  max_fake_samples: 500
+  image_size: 256
+  pre_resize_size: 128
+  jpeg_reencode_quality: 95
+  patch_size: 32
+  bit_planes: [0, 1, 2]
+  normalization: "thresholding"
+
+model:
+  architecture: "raw_only"
+  backbone: "resnet50"
+  pretrained: true
+  num_classes: 1
+
+training:
+  batch_size: 16
+  epochs: 15
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  optimizer: "adam"
+  mixed_precision: true
+  checkpoint_dir: "./checkpoints"
+
+reproducibility:
+  seed: 42
+  deterministic: true

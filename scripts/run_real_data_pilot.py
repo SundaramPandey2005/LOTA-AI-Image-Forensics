@@ -78,6 +78,7 @@ def run_real_data_pilot(
         req_real = cfg["data"].get("max_real_samples", None)
         req_fake = cfg["data"].get("max_fake_samples", None)
         pre_resize = cfg["data"].get("pre_resize_size", None)
+        jpeg_reencode = cfg["data"].get("jpeg_reencode_quality", cfg["data"].get("jpeg_quality", None))
 
         if train_exists and val_exists:
             train_ds = GenImageDataset(
@@ -86,6 +87,7 @@ def run_real_data_pilot(
                 split="train",
                 max_samples_per_class=req_real,
                 pre_resize_size=pre_resize,
+                jpeg_reencode_quality=jpeg_reencode,
                 use_mock_data=False
             )
             val_ds = GenImageDataset(
@@ -94,6 +96,7 @@ def run_real_data_pilot(
                 split="val",
                 max_samples_per_class=cfg["data"].get("max_val_samples", req_real),
                 pre_resize_size=pre_resize,
+                jpeg_reencode_quality=jpeg_reencode,
                 use_mock_data=False
             )
             total_real_samples = sum(1 for s in train_ds.samples if s[1] == 0) + sum(1 for s in val_ds.samples if s[1] == 0)
@@ -106,6 +109,7 @@ def run_real_data_pilot(
                 generators=[gen_name],
                 split=active_split,
                 pre_resize_size=pre_resize,
+                jpeg_reencode_quality=jpeg_reencode,
                 use_mock_data=False
             )
             total_real_samples = sum(1 for s in base_ds.samples if s[1] == 0)
@@ -158,6 +162,7 @@ def run_real_data_pilot(
                 generators=[gen_name],
                 samples=train_samples,
                 pre_resize_size=pre_resize,
+                jpeg_reencode_quality=jpeg_reencode,
                 use_mock_data=False
             )
             val_ds = GenImageDataset(
@@ -165,6 +170,7 @@ def run_real_data_pilot(
                 generators=[gen_name],
                 samples=val_samples,
                 pre_resize_size=pre_resize,
+                jpeg_reencode_quality=jpeg_reencode,
                 use_mock_data=False
             )
 
@@ -200,6 +206,8 @@ def run_real_data_pilot(
     print(f"  Image Size           : 256x256 (MGPS 32x32 Patch)")
     if pre_resize:
         print(f"  Pre-Resize Size      : {pre_resize}x{pre_resize} (Bilinear)")
+    if jpeg_reencode:
+        print(f"  JPEG Re-Encoding     : Quality {jpeg_reencode} (In-Memory)")
     print(f"  Batch Size           : {batch_size}")
     print(f"  Compute Device       : {device} (AMP: {amp_enabled})")
 
@@ -392,7 +400,11 @@ def run_real_data_pilot(
     }
 
     # Resolve human-readable experiment name
-    if "sanity" in exp_id.lower() or "raw" in exp_id.lower():
+    if "encoding" in exp_id.lower():
+        exp_display_name = f"E2 BigGAN Resolution & Encoding Matched Sanity Baseline"
+    elif "resolution" in exp_id.lower():
+        exp_display_name = f"E2 BigGAN Resolution-Matched Sanity Baseline"
+    elif "sanity" in exp_id.lower() or "raw" in exp_id.lower():
         exp_display_name = f"E2 BigGAN Raw-Only Sanity Baseline"
     elif "e2" in exp_id.lower():
         exp_display_name = f"E2 BigGAN NGC Baseline"

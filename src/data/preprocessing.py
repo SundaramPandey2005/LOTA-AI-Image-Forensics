@@ -1,3 +1,4 @@
+import io
 from typing import Tuple, List, Union, Optional, Callable
 from PIL import Image
 import numpy as np
@@ -52,14 +53,18 @@ def get_transforms(
 def preprocess_raw_image(
     image: Image.Image,
     image_size: int = 256,
-    pre_resize_size: Optional[int] = None
+    pre_resize_size: Optional[int] = None,
+    jpeg_reencode_quality: Optional[int] = None
 ) -> torch.Tensor:
     """
     Convert a PIL image to a (3, H, W) float32 PyTorch tensor in [0.0, 255.0].
     
-    If pre_resize_size is specified (e.g. 128), the image is first resized to
-    (pre_resize_size, pre_resize_size) via bilinear interpolation, and then
-    resized to (image_size, image_size).
+    Pipeline order:
+    1. RGB mode check & conversion.
+    2. Optional pre-resizing (e.g. 128x128 via bilinear interpolation).
+    3. Optional in-memory JPEG re-encoding (e.g. quality=95 via BytesIO buffer).
+    4. Target resizing (e.g. 256x256 via bilinear interpolation).
+    5. Conversion to (3, H, W) float32 tensor in [0.0, 255.0].
     """
     if image.mode != "RGB":
         image = image.convert("RGB")
@@ -67,6 +72,12 @@ def preprocess_raw_image(
     if pre_resize_size is not None and pre_resize_size > 0:
         pre_transform = T.Resize((pre_resize_size, pre_resize_size), interpolation=T.InterpolationMode.BILINEAR)
         image = pre_transform(image)
+
+    if jpeg_reencode_quality is not None and jpeg_reencode_quality > 0:
+        buf = io.BytesIO()
+        image.save(buf, format="JPEG", quality=int(jpeg_reencode_quality))
+        buf.seek(0)
+        image = Image.open(buf).convert("RGB")
 
     transforms = get_transforms(image_size=image_size, is_training=False)
     resized = transforms(image)

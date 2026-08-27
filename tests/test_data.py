@@ -130,3 +130,83 @@ class TestDataModule:
 
         ds_128 = GenImageDataset(root_dir="./data/GenImage", pre_resize_size=128, use_mock_data=True)
         assert ds_128.pre_resize_size == 128
+
+    def test_jpeg_reencode_preprocessing_disabled_by_default(self):
+        """Verify that preprocessing is unchanged when jpeg_reencode_quality is None or unset."""
+        from PIL import Image
+        import numpy as np
+
+        np_arr = (np.random.rand(256, 256, 3) * 255).astype(np.uint8)
+        pil_img = Image.fromarray(np_arr)
+
+        out_default = preprocess_raw_image(pil_img, image_size=256)
+        out_none = preprocess_raw_image(pil_img, image_size=256, jpeg_reencode_quality=None)
+
+        assert out_default.shape == (3, 256, 256)
+        assert out_none.shape == (3, 256, 256)
+        assert torch.allclose(out_default, out_none)
+
+    def test_jpeg_reencode_preprocessing_enabled(self):
+        """Verify that in-memory JPEG re-encoding applies DCT compression and outputs (3, 256, 256)."""
+        import io
+        from PIL import Image
+        import numpy as np
+
+        np_arr = (np.random.rand(256, 256, 3) * 255).astype(np.uint8)
+        pil_img = Image.fromarray(np_arr)
+
+        out_jpeg = preprocess_raw_image(pil_img, image_size=256, jpeg_reencode_quality=95)
+
+        assert out_jpeg.shape == (3, 256, 256)
+        assert isinstance(out_jpeg, torch.Tensor)
+        assert out_jpeg.dtype == torch.float32
+
+        # Manually compute in-memory JPEG compression
+        buf = io.BytesIO()
+        pil_img.save(buf, format="JPEG", quality=95)
+        buf.seek(0)
+        decoded = Image.open(buf).convert("RGB")
+        expected_tensor = torch.from_numpy(np.array(decoded, dtype=np.float32)).permute(2, 0, 1)
+
+        assert torch.allclose(out_jpeg, expected_tensor)
+
+    def test_combined_resolution_and_encoding_matched_pipeline(self):
+        """Verify the full 512x512 -> 128x128 -> JPEG Q95 -> 256x256 pipeline produces expected tensor."""
+        import io
+        from PIL import Image
+        import numpy as np
+
+        np_arr = (np.random.rand(512, 512, 3) * 255).astype(np.uint8)
+        pil_img = Image.fromarray(np_arr)
+
+        out_tensor = preprocess_raw_image(
+            pil_img,
+            image_size=256,
+            pre_resize_size=128,
+            jpeg_reencode_quality=95
+        )
+
+        assert out_tensor.shape == (3, 256, 256)
+
+        # Expected sequential execution:
+        # 1. Resize to 128x128
+        img_128 = pil_img.resize((128, 128), Image.BILINEAR)
+        # 2. In-memory JPEG encode & decode at Q95
+        buf = io.BytesIO()
+        img_128.save(buf, format="JPEG", quality=95)
+        buf.seek(0)
+        img_encoded = Image.open(buf).convert("RGB")
+        # 3. Resize to 256x256
+        img_256 = img_encoded.resize((256, 256), Image.BILINEAR)
+        expected = torch.from_numpy(np.array(img_256, dtype=np.float32)).permute(2, 0, 1)
+
+        assert torch.allclose(out_tensor, expected, atol=1e-3)
+
+    def test_dataset_jpeg_reencode_parameter(self):
+        """Verify GenImageDataset stores and defaults jpeg_reencode_quality appropriately."""
+        ds_default = GenImageDataset(root_dir="./data/GenImage", use_mock_data=True)
+        assert ds_default.jpeg_reencode_quality is None
+
+        ds_q95 = GenImageDataset(root_dir="./data/GenImage", jpeg_reencode_quality=95, use_mock_data=True)
+        assert ds_q95.jpeg_reencode_quality == 95
+

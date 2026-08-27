@@ -33,6 +33,8 @@ class GenImageDataset(Dataset):
         split: str = "train",
         image_size: int = 256,
         pre_resize_size: Optional[int] = None,
+        jpeg_reencode_quality: Optional[int] = None,
+        jpeg_quality: Optional[int] = None,
         max_samples_per_class: Optional[int] = None,
         extract_forensics_on_the_fly: bool = True,
         bit_planes: Optional[List[int]] = None,
@@ -52,6 +54,7 @@ class GenImageDataset(Dataset):
         self.split = split
         self.image_size = image_size
         self.pre_resize_size = pre_resize_size
+        self.jpeg_reencode_quality = jpeg_reencode_quality or jpeg_quality
         self.extract_forensics_on_the_fly = extract_forensics_on_the_fly
         self.bit_planes = bit_planes or bit_indices or [0, 1, 2]
         self.normalization_method = normalization or normalization_method or "thresholding"
@@ -150,7 +153,8 @@ class GenImageDataset(Dataset):
                 raw_tensor = preprocess_raw_image(
                     pil_img,
                     image_size=self.image_size,
-                    pre_resize_size=self.pre_resize_size
+                    pre_resize_size=self.pre_resize_size,
+                    jpeg_reencode_quality=self.jpeg_reencode_quality
                 )
             except Exception as e:
                 raise RuntimeError(f"Corrupt or unreadable image file '{file_path}': {e}")
