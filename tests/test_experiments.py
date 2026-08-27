@@ -90,3 +90,31 @@ class TestExperimentDatabaseAndQueries:
         assert len(df_ref) == 1
         assert df_ref.iloc[0]["paper_method"] == "LOTA-nbc"
         assert df_ref.iloc[0]["accuracy"] == 100.0
+
+    def test_vqdm_e3_config_validity(self):
+        """Verify that configs/vqdm_e3_baseline.yaml is valid and conforms to E1 baseline constraints."""
+        import yaml
+        cfg_path = "./configs/vqdm_e3_baseline.yaml"
+        assert os.path.exists(cfg_path), f"Missing {cfg_path}"
+
+        with open(cfg_path, "r") as f:
+            cfg = yaml.safe_load(f)
+
+        assert cfg["experiment_name"] == "vqdm_e3_baseline"
+        assert cfg["generator"] == "vqdm"
+        assert cfg["model"]["architecture"] == "nbc"
+        assert cfg["model"]["backbone"] == "resnet50"
+        assert cfg["model"]["pretrained"] is True
+        assert cfg["data"]["require_exact_sample_counts"] is True
+        assert cfg["data"]["max_real_samples"] == 500
+        assert cfg["data"]["max_fake_samples"] == 500
+        assert cfg["data"]["image_size"] == 256
+        assert cfg["data"]["patch_size"] == 32
+        assert cfg["data"]["bit_planes"] == [0, 1, 2]
+        assert cfg["data"]["normalization"] == "thresholding"
+        assert cfg["training"]["epochs"] == 15
+        assert cfg["training"]["batch_size"] == 16
+        assert cfg["training"]["learning_rate"] == 0.0001
+        assert cfg["training"]["optimizer"] == "adam"
+        assert cfg["reproducibility"]["seed"] == 42
+        assert cfg["reproducibility"]["deterministic"] is True

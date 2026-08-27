@@ -406,6 +406,8 @@ def run_real_data_pilot(
         exp_display_name = f"E2 BigGAN Resolution-Matched Sanity Baseline"
     elif "sanity" in exp_id.lower() or "raw" in exp_id.lower():
         exp_display_name = f"E2 BigGAN Raw-Only Sanity Baseline"
+    elif "e3" in exp_id.lower():
+        exp_display_name = f"E3 {gen_name.upper()} Baseline"
     elif "e2" in exp_id.lower():
         exp_display_name = f"E2 BigGAN NGC Baseline"
     elif "e1" in exp_id.lower():
