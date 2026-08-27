@@ -118,3 +118,87 @@ class TestExperimentDatabaseAndQueries:
         assert cfg["training"]["optimizer"] == "adam"
         assert cfg["reproducibility"]["seed"] == 42
         assert cfg["reproducibility"]["deterministic"] is True
+
+    def test_backfill_e1_idempotency_and_provenance(self, temp_db):
+        """Verify that E1 backfill imports genuine experimental data and is strictly idempotent."""
+        import json
+        from scripts.backfill_e1_results import backfill_e1_experiment
+        db, db_path = temp_db
+
+        # First execution: imports E1
+        success_1 = backfill_e1_experiment(db_path=db_path, summary_path="./experiments/E1_results_summary.txt")
+        assert success_1 is True
+
+        # Verify experiment row
+        df_exp = db.query_df("SELECT * FROM experiments WHERE experiment_id = 'biggan_constrained_baseline_e1'")
+        assert len(df_exp) == 1
+        exp_row = df_exp.iloc[0]
+        assert exp_row["source_type"] == "experimental"
+        assert exp_row["is_mock"] == 0
+        assert exp_row["status"] == "COMPLETED"
+        assert exp_row["model_id"] == "M_NBC_RESNET50"
+        assert exp_row["architecture"] == "nbc"
+
+        # Verify config contains recovery notes
+        cfg_loaded = json.loads(exp_row["config_json"])
+        assert "recovery_metadata" in cfg_loaded
+        assert "E1_results_summary.txt" in cfg_loaded["recovery_metadata"]["source_file"]
+
+        # Verify metrics rows
+        df_metrics = db.query_df("SELECT * FROM metrics WHERE experiment_id = 'biggan_constrained_baseline_e1'")
+        assert len(df_metrics) == 2 # val_best and val_final
+
+        val_best = df_metrics[df_metrics["split"] == "val_best"].iloc[0]
+        assert val_best["source_type"] == "experimental"
+        assert val_best["is_mock"] == 0
+        assert abs(val_best["accuracy"] - 0.8700) < 1e-4
+        assert abs(val_best["auroc"] - 0.94565) < 1e-4
+        assert abs(val_best["average_precision"] - 0.922818) < 1e-4
+        assert abs(val_best["f1"] - 0.879630) < 1e-4
+        assert abs(val_best["precision"] - 0.818966) < 1e-4
+        assert abs(val_best["recall"] - 0.950000) < 1e-4
+
+        # Second execution: verify strict idempotency (no duplicate rows)
+        success_2 = backfill_e1_experiment(db_path=db_path, summary_path="./experiments/E1_results_summary.txt")
+        assert success_2 is True
+
+        df_exp_after = db.query_df("SELECT * FROM experiments WHERE experiment_id = 'biggan_constrained_baseline_e1'")
+        assert len(df_exp_after) == 1
+
+        df_metrics_after = db.query_df("SELECT * FROM metrics WHERE experiment_id = 'biggan_constrained_baseline_e1'")
+        assert len(df_metrics_after) == 2
+
+    def test_parse_e1_summary_file_validation(self):
+        """Verify that parse_e1_summary_file correctly parses valid summaries and rejects invalid summaries."""
+        import tempfile
+        from scripts.backfill_e1_results import parse_e1_summary_file
+
+        # Test valid parsing
+        res = parse_e1_summary_file("./experiments/E1_results_summary.txt")
+        assert res["experiment_id"] == "biggan_constrained_baseline_e1"
+        assert res["generator"] == "biggan"
+        assert res["best_epoch"] == 14
+        assert res["final_epoch"] == 15
+        assert res["status"] == "COMPLETED"
+        assert res["source_type"] == "experimental"
+        assert res["is_mock"] is False
+        assert abs(res["best_metrics"]["accuracy"] - 0.8700) < 1e-4
+        assert abs(res["best_metrics"]["auroc"] - 0.94565) < 1e-4
+        assert abs(res["final_epoch_metrics"]["accuracy"] - 0.8550) < 1e-4
+        assert abs(res["final_epoch_metrics"]["auroc"] - 0.94110) < 1e-4
+
+        # Test missing file error
+        temp_dir = tempfile.mkdtemp()
+        missing_file = os.path.join(temp_dir, "non_existent.txt")
+        with pytest.raises(FileNotFoundError):
+            parse_e1_summary_file(missing_file)
+
+        # Test corrupted/incomplete summary error
+        corrupt_file = os.path.join(temp_dir, "corrupt_summary.txt")
+        with open(corrupt_file, "w", encoding="utf-8") as f:
+            f.write("Experiment ID: biggan_constrained_baseline_e1\nGenerator: biggan\n")
+
+        with pytest.raises(ValueError):
+            parse_e1_summary_file(corrupt_file)
+
+
