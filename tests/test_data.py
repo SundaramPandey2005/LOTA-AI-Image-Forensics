@@ -75,3 +75,13 @@ class TestDataModule:
         assert norm_noise.shape == (3, 256, 256)
         assert selected_patch.shape == (3, 32, 32)
         assert 0 <= selected_idx < 64
+
+    def test_no_silent_mock_fallback_on_missing_dir(self):
+        """Verify that use_mock_data=False raises FileNotFoundError instead of silent fallback."""
+        with pytest.raises(FileNotFoundError):
+            GenImageDataset(
+                root_dir="./data/NonExistentGenImageDir",
+                generators=["biggan"],
+                split="val",
+                use_mock_data=False,
+            )

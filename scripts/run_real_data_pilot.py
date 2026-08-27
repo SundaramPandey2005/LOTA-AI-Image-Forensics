@@ -15,6 +15,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from src.data.dataset import GenImageDataset
+from src.data.splits import create_stratified_split
 from src.models.nbc import LOTANoiseClassifier
 from src.experiments.database import ExperimentDatabase
 from src.experiments.logger import ExperimentLogger
@@ -36,15 +37,15 @@ def run_real_data_pilot(
             cfg = yaml.safe_load(f)
     else:
         cfg = {
-            "experiment_name": "real_data_pilot_sd15",
-            "generator": "sd15",
-            "data": {"root_dir": "./data/GenImage", "use_mock_data": False, "max_real_samples": 100, "max_fake_samples": 100},
+            "experiment_name": "real_data_pilot_biggan",
+            "generator": "biggan",
+            "data": {"root_dir": "./data/GenImage", "use_mock_data": False, "train_val_ratio": 0.7, "max_real_samples": 100, "max_fake_samples": 100},
             "training": {"batch_size": 16, "epochs": 3, "learning_rate": 0.0001, "mixed_precision": True},
             "reproducibility": {"seed": 42}
         }
 
     dataset_root = cfg["data"].get("root_dir", "./data/GenImage")
-    gen_name = cfg.get("generator", "sd15")
+    gen_name = cfg.get("generator", "biggan")
     use_mock = cfg["data"].get("use_mock_data", False)
 
     if use_mock:
@@ -68,20 +69,51 @@ def run_real_data_pilot(
     # 2. Load Real Dataset
     print("\n[DATASET LOADING] Initializing real GenImage dataset...")
     try:
-        train_ds = GenImageDataset(
-            root_dir=dataset_root,
-            generators=[gen_name],
-            split="train",
-            max_samples_per_class=cfg["data"].get("max_real_samples", 100),
-            use_mock_data=False
-        )
-        val_ds = GenImageDataset(
-            root_dir=dataset_root,
-            generators=[gen_name],
-            split="val",
-            max_samples_per_class=cfg["data"].get("max_real_samples", 50),
-            use_mock_data=False
-        )
+        train_exists = os.path.exists(os.path.join(dataset_root, gen_name, "train"))
+        val_exists = os.path.exists(os.path.join(dataset_root, gen_name, "val"))
+
+        if train_exists and val_exists:
+            train_ds = GenImageDataset(
+                root_dir=dataset_root,
+                generators=[gen_name],
+                split="train",
+                max_samples_per_class=cfg["data"].get("max_real_samples", 100),
+                use_mock_data=False
+            )
+            val_ds = GenImageDataset(
+                root_dir=dataset_root,
+                generators=[gen_name],
+                split="val",
+                max_samples_per_class=cfg["data"].get("max_val_samples", cfg["data"].get("max_real_samples", 50)),
+                use_mock_data=False
+            )
+        else:
+            # Handle minimal single-split dataset (e.g. biggan/val with nature and ai)
+            active_split = "val" if val_exists else "train"
+            base_ds = GenImageDataset(
+                root_dir=dataset_root,
+                generators=[gen_name],
+                split=active_split,
+                use_mock_data=False
+            )
+            raw_samples = [{"path": s[0], "label": int(s[1]), "generator": s[2]} for s in base_ds.samples]
+            train_samples, val_samples = create_stratified_split(
+                raw_samples,
+                train_ratio=cfg["data"].get("train_val_ratio", 0.7),
+                seed=cfg.get("reproducibility", {}).get("seed", 42)
+            )
+            train_ds = GenImageDataset(
+                root_dir=dataset_root,
+                generators=[gen_name],
+                samples=train_samples,
+                use_mock_data=False
+            )
+            val_ds = GenImageDataset(
+                root_dir=dataset_root,
+                generators=[gen_name],
+                samples=val_samples,
+                use_mock_data=False
+            )
     except Exception as e:
         print(f"[ERROR] Failed to load real dataset: {e}")
         print("\n  REAL-DATA PILOT GATE: FAILED")
@@ -183,8 +215,8 @@ def run_real_data_pilot(
     # Log to database as experimental
     logger = ExperimentLogger(db_path)
     logger.log_run(
-        experiment_id=cfg.get("experiment_name", "real_data_pilot_sd15"),
-        name="Real-Data Pilot SD1.5",
+        experiment_id=cfg.get("experiment_name", f"real_data_pilot_{gen_name}"),
+        name=f"Real-Data Pilot {gen_name.upper()}",
         config=cfg,
         model_id="M_NBC_RESNET50",
         metrics_by_generator={gen_name: {"accuracy": acc, "auroc": auroc, "average_precision": ap}},

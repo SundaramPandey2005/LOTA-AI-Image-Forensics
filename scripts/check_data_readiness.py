@@ -38,7 +38,14 @@ def check_genimage_readiness(root_dir: str = "./data/GenImage") -> bool:
     print(f"  [CHECK 1] Dataset Root Directory : FOUND ({root_dir})")
     print(f"  [CHECK 2] Generator Folders      : FOUND ({generators})")
 
-    ds = GenImageDataset(root_dir=root_dir, split="val", use_mock_data=False)
+    if not generators:
+        print("  [CHECK 3] Sample Population      : NO GENERATOR FOLDERS FOUND")
+        print("-" * 75)
+        print("  REAL-DATA VALIDATION STATUS: NOT READY")
+        print("-" * 75)
+        return False
+
+    ds = GenImageDataset(root_dir=root_dir, generators=generators, split="val", use_mock_data=False)
     if ds.use_mock_data or len(ds.samples) < 2:
         print("  [CHECK 3] Sample Population      : INSUFFICIENT (< 2 real/fake files)")
         print("-" * 75)
@@ -47,8 +54,8 @@ def check_genimage_readiness(root_dir: str = "./data/GenImage") -> bool:
         return False
 
     # Check real and fake existence
-    has_real = any(s["label"] == 0 for s in ds.samples)
-    has_fake = any(s["label"] == 1 for s in ds.samples)
+    has_real = any(s[1] == 0 for s in ds.samples)
+    has_fake = any(s[1] == 1 for s in ds.samples)
     print(f"  [CHECK 3] Real Nature Images     : {'FOUND' if has_real else 'MISSING'}")
     print(f"  [CHECK 4] Fake AI Images         : {'FOUND' if has_fake else 'MISSING'}")
 

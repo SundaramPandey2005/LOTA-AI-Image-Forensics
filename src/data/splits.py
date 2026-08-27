@@ -58,16 +58,17 @@ def scan_generator_directory(
     max_samples_per_class: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     samples = []
-    valid_exts = ("*.jpg", "*.jpeg", "*.png", "*.webp", "*.JPEG", "*.JPG", "*.PNG")
+    valid_exts = ("*.jpg", "*.jpeg", "*.png", "*.webp", "*.JPEG", "*.JPG", "*.PNG", "*.WEBP")
 
     real_paths = []
-    for pattern in ["*real*/**/*", "*0_real*/**/*", "real/**/*"]:
+    for pattern in ["*real*/**/*", "*0_real*/**/*", "real/**/*", "*nature*/**/*", "nature/**/*", "*nature*/*", "nature/*"]:
         for ext in valid_exts:
             real_paths.extend(glob.glob(os.path.join(generator_dir, pattern, ext), recursive=True))
+            real_paths.extend(glob.glob(os.path.join(generator_dir, pattern), recursive=True) if pattern.endswith(ext.replace("*", "")) else [])
     real_paths = sorted(list(set(real_paths)))
 
     fake_paths = []
-    for pattern in ["*fake*/**/*", "*1_fake*/**/*", "*ai*/**/*", "fake/**/*"]:
+    for pattern in ["*fake*/**/*", "*1_fake*/**/*", "*ai*/**/*", "fake/**/*", "ai/**/*", "*ai*/*", "ai/*"]:
         for ext in valid_exts:
             fake_paths.extend(glob.glob(os.path.join(generator_dir, pattern, ext), recursive=True))
     fake_paths = sorted(list(set(fake_paths)))

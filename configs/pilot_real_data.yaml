@@ -1,10 +1,11 @@
 # LOTA Real-Data Pilot Configuration (Gate B)
-experiment_name: "real_data_pilot_sd15"
-generator: "sd15"
+experiment_name: "real_data_pilot_biggan"
+generator: "biggan"
 
 data:
   root_dir: "./data/GenImage"
   use_mock_data: false
+  train_val_ratio: 0.7
   max_real_samples: 100
   max_fake_samples: 100
   image_size: 256

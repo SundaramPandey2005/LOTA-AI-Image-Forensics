@@ -80,31 +80,40 @@ class GenImageDataset(Dataset):
             self._discover_samples(max_samples_per_class)
 
     def _discover_samples(self, max_samples_per_class: Optional[int]):
-        real_exts = ("*.jpg", "*.jpeg", "*.png", "*.webp")
+        real_exts = ("*.jpg", "*.jpeg", "*.png", "*.webp", "*.JPG", "*.JPEG", "*.PNG", "*.WEBP")
         discovered_by_gen = {}
+        seen_files = set()
 
         for gen in self.generators:
             discovered_by_gen[gen] = {"nature": 0, "ai": 0}
-            # Search both standard GenImage formats:
-            # Pattern A: root/gen/split/nature and root/gen/split/ai
-            # Pattern B: root/gen/nature and root/gen/ai
-            for label_name, label_val in [("nature", 0.0), ("ai", 1.0)]:
-                dir_options = [
-                    os.path.join(self.root_dir, gen, self.split, label_name),
-                    os.path.join(self.root_dir, gen, label_name)
-                ]
+            for label_aliases, label_val in [
+                (["nature", "0_real", "real"], 0.0),
+                (["ai", "1_fake", "fake"], 1.0)
+            ]:
                 class_files = []
-                for p_dir in dir_options:
-                    if os.path.exists(p_dir):
-                        for ext in real_exts:
-                            class_files.extend(glob.glob(os.path.join(p_dir, ext)))
-                            class_files.extend(glob.glob(os.path.join(p_dir, "**", ext), recursive=True))
+                for label_name in label_aliases:
+                    dir_options = [
+                        os.path.join(self.root_dir, gen, self.split, label_name),
+                        os.path.join(self.root_dir, gen, label_name)
+                    ]
+                    for p_dir in dir_options:
+                        if os.path.exists(p_dir):
+                            for ext in real_exts:
+                                for fp in glob.glob(os.path.join(p_dir, ext)):
+                                    if fp not in seen_files:
+                                        seen_files.add(fp)
+                                        class_files.append(fp)
+                                for fp in glob.glob(os.path.join(p_dir, "**", ext), recursive=True):
+                                    if fp not in seen_files:
+                                        seen_files.add(fp)
+                                        class_files.append(fp)
 
                 class_files = sorted(list(set(class_files)))
                 if max_samples_per_class is not None and max_samples_per_class > 0:
                     class_files = class_files[:max_samples_per_class]
 
-                discovered_by_gen[gen][label_name] = len(class_files)
+                key = "nature" if label_val == 0.0 else "ai"
+                discovered_by_gen[gen][key] = len(class_files)
                 for fp in class_files:
                     self.samples.append((fp, label_val, gen))
 
