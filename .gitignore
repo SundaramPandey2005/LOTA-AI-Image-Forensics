@@ -35,9 +35,10 @@ checkpoints/
 runs/
 wandb/
 
-# Datasets
-data/
-datasets/
+# Datasets (root level only, preserve src/data/)
+/data/
+/datasets/
+!src/data/
 *.zip
 *.tar
 *.tar.gz
