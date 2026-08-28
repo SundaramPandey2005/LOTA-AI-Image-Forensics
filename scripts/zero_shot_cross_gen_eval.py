@@ -3,9 +3,11 @@ LOTA Zero-Shot Cross-Generator Evaluation Script
 Performs cross-generator zero-shot evaluation between:
   1. E1 (Trained on BigGAN) -> Evaluated on VQDM validation data
   2. E3 (Trained on VQDM)   -> Evaluated on BigGAN validation data
+Provides persistent recording to SQLite database and human-readable summary files.
 """
 import os
 import sys
+import re
 import argparse
 from typing import Dict, Any, Optional
 
@@ -19,6 +21,7 @@ from src.utils.config_parser import load_config
 from src.models import create_model
 from src.data.dataset import GenImageDataset
 from src.training.metrics import compute_classification_metrics
+from src.experiments.database import ExperimentDatabase
 
 
 def load_model_from_checkpoint(
@@ -150,6 +153,7 @@ def evaluate_cross_generator_pair(
 
     result_payload = {
         "source_experiment": source_name,
+        "source_experiment_id": cfg.get("experiment_name", "unknown_exp"),
         "trained_generator": cfg.get("generator", "unknown"),
         "target_generator": target_generator,
         "checkpoint_path": checkpoint_path,
@@ -158,6 +162,10 @@ def evaluate_cross_generator_pair(
         "total_samples": len(eval_ds),
         "real_samples": real_count,
         "fake_samples": fake_count,
+        "split": "val_zero_shot",
+        "source_type": "mock_fixture" if use_mock else "experimental",
+        "is_mock": use_mock,
+        "is_unseen": True,
         "metrics": metrics
     }
 
@@ -187,6 +195,254 @@ def print_result_block(title: str, res: Dict[str, Any]):
     print("=" * 80 + "\n")
 
 
+def parse_zero_shot_summary_file(summary_path: str = "./experiments/zero_shot_results_summary.txt") -> Dict[str, Any]:
+    """
+    Parses and validates the preserved zero-shot cross-generator evaluation summary text file.
+    Raises ValueError or FileNotFoundError if the file format or required metrics are missing or inconsistent.
+    """
+    if not os.path.exists(summary_path):
+        raise FileNotFoundError(f"Zero-shot summary file not found at: '{os.path.abspath(summary_path)}'")
+
+    with open(summary_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    def extract_float(pattern: str, text: str, field_name: str) -> float:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            raise ValueError(f"Required numeric metric '{field_name}' not found in summary file: {summary_path}")
+        return float(match.group(1))
+
+    def extract_str(pattern: str, text: str, field_name: str) -> str:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            raise ValueError(f"Required field '{field_name}' not found in summary file: {summary_path}")
+        return match.group(1).strip()
+
+    # 1. Parse E1 section
+    e1_match = re.search(r"E1 BIGGAN-TRAINED -> VQDM VALIDATION RESULTS\s*(.*?)(?:E3 VQDM-TRAINED|EVALUATION PROVENANCE|$)", content, re.DOTALL | re.IGNORECASE)
+    if not e1_match:
+        raise ValueError(f"Could not locate 'E1 BIGGAN-TRAINED -> VQDM VALIDATION RESULTS' section in: {summary_path}")
+    e1_text = e1_match.group(1)
+
+    e1_exp_id = extract_str(r"(?:^|\n)\s*Source Experiment ID:\s*([a-zA-Z0-9_-]+)", e1_text, "E1 Experiment ID")
+    e1_trained_gen = extract_str(r"(?:^|\n)\s*Trained Generator:\s*([a-zA-Z0-9_-]+)", e1_text, "E1 Trained Generator").lower()
+    e1_target_gen = extract_str(r"(?:^|\n)\s*Target Evaluation Generator:\s*([a-zA-Z0-9_-]+)", e1_text, "E1 Target Generator").lower()
+    e1_acc = extract_float(r"(?:^|\n)\s*Validation Accuracy:\s*([0-9.]+)", e1_text, "E1 Accuracy")
+    e1_auroc = extract_float(r"(?:^|\n)\s*Validation AUROC:\s*([0-9.]+)", e1_text, "E1 AUROC")
+    e1_ap = extract_float(r"(?:^|\n)\s*Average Precision:\s*([0-9.]+)", e1_text, "E1 Average Precision")
+    e1_f1 = extract_float(r"(?:^|\n)\s*F1 Score:\s*([0-9.]+)", e1_text, "E1 F1 Score")
+    e1_prec = extract_float(r"(?:^|\n)\s*Precision:\s*([0-9.]+)", e1_text, "E1 Precision")
+    e1_rec = extract_float(r"(?:^|\n)\s*Recall:\s*([0-9.]+)", e1_text, "E1 Recall")
+
+    # 2. Parse E3 section
+    e3_match = re.search(r"E3 VQDM-TRAINED -> BIGGAN VALIDATION RESULTS\s*(.*?)(?:EVALUATION PROVENANCE|$)", content, re.DOTALL | re.IGNORECASE)
+    if not e3_match:
+        raise ValueError(f"Could not locate 'E3 VQDM-TRAINED -> BIGGAN VALIDATION RESULTS' section in: {summary_path}")
+    e3_text = e3_match.group(1)
+
+    e3_exp_id = extract_str(r"(?:^|\n)\s*Source Experiment ID:\s*([a-zA-Z0-9_-]+)", e3_text, "E3 Experiment ID")
+    e3_trained_gen = extract_str(r"(?:^|\n)\s*Trained Generator:\s*([a-zA-Z0-9_-]+)", e3_text, "E3 Trained Generator").lower()
+    e3_target_gen = extract_str(r"(?:^|\n)\s*Target Evaluation Generator:\s*([a-zA-Z0-9_-]+)", e3_text, "E3 Target Generator").lower()
+    e3_acc = extract_float(r"(?:^|\n)\s*Validation Accuracy:\s*([0-9.]+)", e3_text, "E3 Accuracy")
+    e3_auroc = extract_float(r"(?:^|\n)\s*Validation AUROC:\s*([0-9.]+)", e3_text, "E3 AUROC")
+    e3_ap = extract_float(r"(?:^|\n)\s*Average Precision:\s*([0-9.]+)", e3_text, "E3 Average Precision")
+    e3_f1 = extract_float(r"(?:^|\n)\s*F1 Score:\s*([0-9.]+)", e3_text, "E3 F1 Score")
+    e3_prec = extract_float(r"(?:^|\n)\s*Precision:\s*([0-9.]+)", e3_text, "E3 Precision")
+    e3_rec = extract_float(r"(?:^|\n)\s*Recall:\s*([0-9.]+)", e3_text, "E3 Recall")
+
+    # 3. Parse Provenance section
+    prov_match = re.search(r"EVALUATION PROVENANCE & STATUS\s*(.*?)$", content, re.DOTALL | re.IGNORECASE)
+    if not prov_match:
+        raise ValueError(f"Could not locate 'EVALUATION PROVENANCE & STATUS' section in: {summary_path}")
+    prov_text = prov_match.group(1)
+
+    status = extract_str(r"(?:^|\n)\s*Status:\s*([a-zA-Z]+)", prov_text, "Status").upper()
+    source_type = extract_str(r"(?:^|\n)\s*Source Type:\s*([a-zA-Z_-]+)", prov_text, "Source Type").lower()
+    mock_data_str = extract_str(r"(?:^|\n)\s*Mock Data:\s*([a-zA-Z]+)", prov_text, "Mock Data").lower()
+    is_mock = mock_data_str == "true"
+
+    if status != "COMPLETED":
+        raise ValueError(f"Expected status COMPLETED, got '{status}'")
+    if source_type != "experimental":
+        raise ValueError(f"Expected source_type 'experimental', got '{source_type}'")
+    if is_mock:
+        raise ValueError("Expected is_mock to be False for real experimental results")
+
+    return {
+        "e1_to_vqdm": {
+            "source_experiment": "E1 BigGAN Baseline",
+            "source_experiment_id": e1_exp_id,
+            "trained_generator": e1_trained_gen,
+            "target_generator": e1_target_gen,
+            "architecture": "nbc",
+            "total_samples": 200,
+            "real_samples": 100,
+            "fake_samples": 100,
+            "split": "val_zero_shot",
+            "source_type": source_type,
+            "is_mock": is_mock,
+            "is_unseen": True,
+            "metrics": {
+                "accuracy": e1_acc,
+                "auroc": e1_auroc,
+                "average_precision": e1_ap,
+                "f1": e1_f1,
+                "precision": e1_prec,
+                "recall": e1_rec
+            }
+        },
+        "e3_to_biggan": {
+            "source_experiment": "E3 VQDM Baseline",
+            "source_experiment_id": e3_exp_id,
+            "trained_generator": e3_trained_gen,
+            "target_generator": e3_target_gen,
+            "architecture": "nbc",
+            "total_samples": 200,
+            "real_samples": 100,
+            "fake_samples": 100,
+            "split": "val_zero_shot",
+            "source_type": source_type,
+            "is_mock": is_mock,
+            "is_unseen": True,
+            "metrics": {
+                "accuracy": e3_acc,
+                "auroc": e3_auroc,
+                "average_precision": e3_ap,
+                "f1": e3_f1,
+                "precision": e3_prec,
+                "recall": e3_rec
+            }
+        },
+        "status": status,
+        "source_type": source_type,
+        "is_mock": is_mock
+    }
+
+
+def record_zero_shot_evaluation_results(
+    db_path: str = "./experiments/results/lota_experiments.db",
+    summary_path: Optional[str] = "./experiments/zero_shot_results_summary.txt",
+    results_dict: Optional[Dict[str, Any]] = None,
+    split: str = "val_zero_shot"
+) -> bool:
+    """
+    Persistently records completed zero-shot cross-generator evaluation results into the SQLite database.
+    Guarantees strict idempotency and provenance integrity (source_type='experimental', is_unseen=True).
+    """
+    if results_dict is not None:
+        payload = results_dict
+    elif summary_path is not None:
+        payload = parse_zero_shot_summary_file(summary_path)
+    else:
+        raise ValueError("Either summary_path or results_dict must be provided to record results.")
+
+    db = ExperimentDatabase(db_path)
+
+    # 1. Ensure Model Record
+    db.insert_model(
+        model_id="M_NBC_RESNET50",
+        architecture="nbc",
+        backbone="resnet50",
+        patch_size=32,
+        normalization="thresholding",
+        bit_planes="[0, 1, 2]"
+    )
+
+    # Process E1 Evaluation
+    res_e1 = payload.get("e1_to_vqdm", {})
+    e1_exp_id = res_e1.get("source_experiment_id", "biggan_constrained_baseline_e1")
+    e1_target_gen = res_e1.get("target_generator", "vqdm")
+    e1_metrics = res_e1.get("metrics", {})
+    e1_source_type = res_e1.get("source_type", "experimental")
+    e1_is_mock = res_e1.get("is_mock", False)
+
+    # Process E3 Evaluation
+    res_e3 = payload.get("e3_to_biggan", {})
+    e3_exp_id = res_e3.get("source_experiment_id", "vqdm_e3_baseline")
+    e3_target_gen = res_e3.get("target_generator", "biggan")
+    e3_metrics = res_e3.get("metrics", {})
+    e3_source_type = res_e3.get("source_type", "experimental")
+    e3_is_mock = res_e3.get("is_mock", False)
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+
+        # Ensure E1 Experiment exists in experiments table
+        cursor.execute("SELECT experiment_id FROM experiments WHERE experiment_id = ?", (e1_exp_id,))
+        if not cursor.fetchone():
+            e1_cfg = {
+                "experiment_name": e1_exp_id,
+                "generator": "biggan",
+                "model": {"architecture": "nbc", "backbone": "resnet50"},
+                "data": {"image_size": 256, "patch_size": 32, "bit_planes": [0, 1, 2], "normalization": "thresholding"}
+            }
+            db.insert_experiment(
+                experiment_id=e1_exp_id,
+                name="E1 BigGAN Constrained Baseline",
+                model_id="M_NBC_RESNET50",
+                architecture="nbc",
+                config=e1_cfg,
+                source_type=e1_source_type,
+                is_mock=e1_is_mock,
+                status="COMPLETED"
+            )
+
+        # Ensure E3 Experiment exists in experiments table
+        cursor.execute("SELECT experiment_id FROM experiments WHERE experiment_id = ?", (e3_exp_id,))
+        if not cursor.fetchone():
+            e3_cfg = {
+                "experiment_name": e3_exp_id,
+                "generator": "vqdm",
+                "model": {"architecture": "nbc", "backbone": "resnet50"},
+                "data": {"image_size": 256, "patch_size": 32, "bit_planes": [0, 1, 2], "normalization": "thresholding"}
+            }
+            db.insert_experiment(
+                experiment_id=e3_exp_id,
+                name="E3 VQDM Baseline",
+                model_id="M_NBC_RESNET50",
+                architecture="nbc",
+                config=e3_cfg,
+                source_type=e3_source_type,
+                is_mock=e3_is_mock,
+                status="COMPLETED"
+            )
+
+        # Delete existing zero-shot metrics for idempotency
+        cursor.execute(
+            "DELETE FROM metrics WHERE experiment_id = ? AND generator_id = ? AND split = ?",
+            (e1_exp_id, e1_target_gen, split)
+        )
+        cursor.execute(
+            "DELETE FROM metrics WHERE experiment_id = ? AND generator_id = ? AND split = ?",
+            (e3_exp_id, e3_target_gen, split)
+        )
+        conn.commit()
+
+    # Insert zero-shot metrics with is_unseen=True
+    db.insert_metrics(
+        experiment_id=e1_exp_id,
+        generator_id=e1_target_gen,
+        metrics=e1_metrics,
+        split=split,
+        source_type=e1_source_type,
+        is_mock=e1_is_mock,
+        is_unseen=True
+    )
+
+    db.insert_metrics(
+        experiment_id=e3_exp_id,
+        generator_id=e3_target_gen,
+        metrics=e3_metrics,
+        split=split,
+        source_type=e3_source_type,
+        is_mock=e3_is_mock,
+        is_unseen=True
+    )
+
+    print(f"[PERSISTENCE SUCCESS] Successfully recorded zero-shot cross-generator evaluation results to SQLite database ({db_path}).")
+    return True
+
+
 def run_cross_generator_evaluations(
     e1_config: str = "./configs/biggan_constrained_baseline_e1.yaml",
     e1_checkpoint: str = "./checkpoints/biggan_constrained_baseline_e1_best.pth",
@@ -195,12 +451,15 @@ def run_cross_generator_evaluations(
     data_root: str = "./data/GenImage",
     batch_size: int = 16,
     device: Optional[torch.device] = None,
-    use_mock: bool = False
+    use_mock: bool = False,
+    save_to_db: bool = False,
+    db_path: str = "./experiments/results/lota_experiments.db"
 ) -> Dict[str, Dict[str, Any]]:
     """
     Executes both cross-generator zero-shot evaluations:
       1. E1 BigGAN -> VQDM
       2. E3 VQDM -> BigGAN
+    Optionally persists results directly into the SQLite database.
     """
     dev = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\n[EVALUATION START] Initializing Zero-Shot Cross-Generator Evaluations on device: {dev}")
@@ -237,6 +496,13 @@ def run_cross_generator_evaluations(
     print_result_block("E3 VQDM -> BigGAN", res_e3_to_biggan)
     results["e3_to_biggan"] = res_e3_to_biggan
 
+    if save_to_db:
+        record_zero_shot_evaluation_results(
+            db_path=db_path,
+            results_dict=results,
+            split="val_zero_shot"
+        )
+
     return results
 
 
@@ -249,7 +515,19 @@ def main():
     parser.add_argument("--data-root", type=str, default="./data/GenImage", help="Root directory of GenImage dataset")
     parser.add_argument("--batch-size", type=int, default=16, help="Evaluation batch size")
     parser.add_argument("--mock", action="store_true", help="Use synthetic mock data for test/CI validation")
+    parser.add_argument("--save-db", action="store_true", help="Persist evaluation metrics into SQLite database")
+    parser.add_argument("--db-path", type=str, default="./experiments/results/lota_experiments.db", help="Path to SQLite database")
+    parser.add_argument("--record-completed", action="store_true", help="Record completed zero-shot evaluation results from summary file into DB")
+    parser.add_argument("--summary-path", type=str, default="./experiments/zero_shot_results_summary.txt", help="Path to summary text file")
     args = parser.parse_args()
+
+    if args.record_completed:
+        record_zero_shot_evaluation_results(
+            db_path=args.db_path,
+            summary_path=args.summary_path,
+            split="val_zero_shot"
+        )
+        return
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -261,7 +539,9 @@ def main():
         data_root=args.data_root,
         batch_size=args.batch_size,
         device=device,
-        use_mock=args.mock
+        use_mock=args.mock,
+        save_to_db=args.save_db,
+        db_path=args.db_path
     )
 
 

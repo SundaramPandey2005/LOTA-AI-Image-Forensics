@@ -295,7 +295,7 @@ with tabs[1]:
     """)
 
     if not df_metrics.empty:
-        pivot_acc = df_metrics.pivot(index="Experiment", columns="Generator", values="Accuracy")
+        pivot_acc = df_metrics.pivot_table(index="Experiment", columns="Generator", values="Accuracy", aggfunc="max")
         st.dataframe(pivot_acc.style.highlight_max(axis=0, color="#DEF7EC").format("{:.2f}%"), use_container_width=True)
 
         st.markdown("#### Key Generalization Findings:")

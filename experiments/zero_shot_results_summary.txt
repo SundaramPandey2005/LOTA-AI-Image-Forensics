@@ -1,0 +1,103 @@
+============================================================
+LOTA AI IMAGE FORENSICS
+ZERO-SHOT CROSS-GENERATOR EVALUATION RESULTS
+============================================================
+
+Evaluation Setting:
+Zero-Shot Cross-Generator Evaluation on GenImage Validation Splits
+
+Evaluations:
+1. E1 BigGAN Baseline -> VQDM Validation Split
+2. E3 VQDM Baseline   -> BigGAN Validation Split
+
+------------------------------------------------------------
+E1 BIGGAN-TRAINED -> VQDM VALIDATION RESULTS
+------------------------------------------------------------
+
+Source Experiment ID:
+biggan_constrained_baseline_e1
+
+Trained Generator:
+BigGAN
+
+Target Evaluation Generator:
+VQDM
+
+Evaluation Split:
+Validation (val_zero_shot)
+
+Total Samples Evaluated:
+200 (100 Real/Nature, 100 Fake/AI)
+
+Architecture:
+NBC / LOTA Noise Classifier (ResNet50 Backbone)
+
+Validation Accuracy:
+0.5150
+
+Validation AUROC:
+0.5524
+
+Average Precision:
+0.5407
+
+F1 Score:
+0.3660
+
+Precision:
+0.5283
+
+Recall:
+0.2800
+
+------------------------------------------------------------
+E3 VQDM-TRAINED -> BIGGAN VALIDATION RESULTS
+------------------------------------------------------------
+
+Source Experiment ID:
+vqdm_e3_baseline
+
+Trained Generator:
+VQDM
+
+Target Evaluation Generator:
+BigGAN
+
+Evaluation Split:
+Validation (val_zero_shot)
+
+Total Samples Evaluated:
+200 (100 Real/Nature, 100 Fake/AI)
+
+Architecture:
+NBC / LOTA Noise Classifier (ResNet50 Backbone)
+
+Validation Accuracy:
+0.4650
+
+Validation AUROC:
+0.4738
+
+Average Precision:
+0.4758
+
+F1 Score:
+0.3593
+
+Precision:
+0.4478
+
+Recall:
+0.3000
+
+------------------------------------------------------------
+EVALUATION PROVENANCE & STATUS
+------------------------------------------------------------
+
+Status: COMPLETED
+Source Type: experimental
+Mock Data: False
+Is Unseen: True
+Evaluation Type: zero_shot_cross_generator
+
+============================================================

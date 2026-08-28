@@ -204,10 +204,10 @@ def backfill_e1_experiment(
         }
     }
 
-    # Clean existing metrics/robustness for this experiment to ensure strict idempotency
+    # Clean existing in-domain validation metrics/robustness for this experiment to ensure strict idempotency
     with db.get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM metrics WHERE experiment_id = ?", (exp_id,))
+        cursor.execute("DELETE FROM metrics WHERE experiment_id = ? AND split IN ('val_best', 'val_final')", (exp_id,))
         cursor.execute("DELETE FROM robustness_results WHERE experiment_id = ?", (exp_id,))
         conn.commit()
 

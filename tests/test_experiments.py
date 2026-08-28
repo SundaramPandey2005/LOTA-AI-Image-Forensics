@@ -245,5 +245,164 @@ class TestExperimentDatabaseAndQueries:
             assert 0.0 <= r["metrics"]["accuracy"] <= 1.0
             assert 0.0 <= r["metrics"]["auroc"] <= 1.0
 
+    def test_parse_zero_shot_summary_file(self):
+        """Verify that parse_zero_shot_summary_file accurately parses valid summary and rejects invalid."""
+        import tempfile
+        from scripts.zero_shot_cross_gen_eval import parse_zero_shot_summary_file
+
+        # Test valid parsing from actual summary file
+        parsed = parse_zero_shot_summary_file("./experiments/zero_shot_results_summary.txt")
+        assert "e1_to_vqdm" in parsed
+        assert "e3_to_biggan" in parsed
+
+        e1 = parsed["e1_to_vqdm"]
+        assert e1["source_experiment_id"] == "biggan_constrained_baseline_e1"
+        assert e1["trained_generator"] == "biggan"
+        assert e1["target_generator"] == "vqdm"
+        assert e1["total_samples"] == 200
+        assert e1["real_samples"] == 100
+        assert e1["fake_samples"] == 100
+        assert abs(e1["metrics"]["accuracy"] - 0.5150) < 1e-4
+        assert abs(e1["metrics"]["auroc"] - 0.5524) < 1e-4
+        assert abs(e1["metrics"]["average_precision"] - 0.5407) < 1e-4
+        assert abs(e1["metrics"]["f1"] - 0.3660) < 1e-4
+        assert abs(e1["metrics"]["precision"] - 0.5283) < 1e-4
+        assert abs(e1["metrics"]["recall"] - 0.2800) < 1e-4
+
+        e3 = parsed["e3_to_biggan"]
+        assert e3["source_experiment_id"] == "vqdm_e3_baseline"
+        assert e3["trained_generator"] == "vqdm"
+        assert e3["target_generator"] == "biggan"
+        assert e3["total_samples"] == 200
+        assert e3["real_samples"] == 100
+        assert e3["fake_samples"] == 100
+        assert abs(e3["metrics"]["accuracy"] - 0.4650) < 1e-4
+        assert abs(e3["metrics"]["auroc"] - 0.4738) < 1e-4
+        assert abs(e3["metrics"]["average_precision"] - 0.4758) < 1e-4
+        assert abs(e3["metrics"]["f1"] - 0.3593) < 1e-4
+        assert abs(e3["metrics"]["precision"] - 0.4478) < 1e-4
+        assert abs(e3["metrics"]["recall"] - 0.3000) < 1e-4
+
+        # Test error handling on missing file
+        temp_dir = tempfile.mkdtemp()
+        missing_file = os.path.join(temp_dir, "missing_zero_shot.txt")
+        with pytest.raises(FileNotFoundError):
+            parse_zero_shot_summary_file(missing_file)
+
+        # Test error handling on corrupt file
+        corrupt_file = os.path.join(temp_dir, "corrupt_zero_shot.txt")
+        with open(corrupt_file, "w", encoding="utf-8") as f:
+            f.write("Invalid Zero Shot Summary Content\n")
+
+        with pytest.raises(ValueError):
+            parse_zero_shot_summary_file(corrupt_file)
+
+    def test_record_zero_shot_evaluation_results_idempotency_and_provenance(self, temp_db):
+        """Verify that zero-shot evaluation recording writes valid provenance records and is idempotent."""
+        from scripts.zero_shot_cross_gen_eval import record_zero_shot_evaluation_results
+        db, db_path = temp_db
+
+        # First recording
+        success_1 = record_zero_shot_evaluation_results(
+            db_path=db_path,
+            summary_path="./experiments/zero_shot_results_summary.txt"
+        )
+        assert success_1 is True
+
+        # Verify experiments table
+        df_exp = db.query_df("SELECT * FROM experiments WHERE experiment_id IN ('biggan_constrained_baseline_e1', 'vqdm_e3_baseline')")
+        assert len(df_exp) == 2
+        for _, row in df_exp.iterrows():
+            assert row["source_type"] == "experimental"
+            assert row["is_mock"] == 0
+            assert row["status"] == "COMPLETED"
+
+        # Verify metrics table
+        df_metrics = db.query_df("SELECT * FROM metrics WHERE split = 'val_zero_shot'")
+        assert len(df_metrics) == 2
+
+        # Verify E1 -> VQDM
+        row_e1 = df_metrics[df_metrics["experiment_id"] == "biggan_constrained_baseline_e1"].iloc[0]
+        assert row_e1["generator_id"] == "vqdm"
+        assert row_e1["split"] == "val_zero_shot"
+        assert row_e1["is_unseen"] == 1
+        assert row_e1["source_type"] == "experimental"
+        assert row_e1["is_mock"] == 0
+        assert abs(row_e1["accuracy"] - 0.5150) < 1e-4
+        assert abs(row_e1["auroc"] - 0.5524) < 1e-4
+        assert abs(row_e1["average_precision"] - 0.5407) < 1e-4
+        assert abs(row_e1["f1"] - 0.3660) < 1e-4
+        assert abs(row_e1["precision"] - 0.5283) < 1e-4
+        assert abs(row_e1["recall"] - 0.2800) < 1e-4
+
+        # Verify E3 -> BigGAN
+        row_e3 = df_metrics[df_metrics["experiment_id"] == "vqdm_e3_baseline"].iloc[0]
+        assert row_e3["generator_id"] == "biggan"
+        assert row_e3["split"] == "val_zero_shot"
+        assert row_e3["is_unseen"] == 1
+        assert row_e3["source_type"] == "experimental"
+        assert row_e3["is_mock"] == 0
+        assert abs(row_e3["accuracy"] - 0.4650) < 1e-4
+        assert abs(row_e3["auroc"] - 0.4738) < 1e-4
+        assert abs(row_e3["average_precision"] - 0.4758) < 1e-4
+        assert abs(row_e3["f1"] - 0.3593) < 1e-4
+        assert abs(row_e3["precision"] - 0.4478) < 1e-4
+        assert abs(row_e3["recall"] - 0.3000) < 1e-4
+
+        # Second recording: verify idempotency
+        success_2 = record_zero_shot_evaluation_results(
+            db_path=db_path,
+            summary_path="./experiments/zero_shot_results_summary.txt"
+        )
+        assert success_2 is True
+
+        df_metrics_after = db.query_df("SELECT * FROM metrics WHERE split = 'val_zero_shot'")
+        assert len(df_metrics_after) == 2
+
+    def test_zero_shot_cross_gen_evaluation_mock_with_db_save(self, temp_db):
+        """Verify that zero-shot evaluation can execute with mock data and save directly to SQLite."""
+        import tempfile
+        import torch
+        from scripts.zero_shot_cross_gen_eval import run_cross_generator_evaluations
+        from src.models import create_model
+        from src.utils.config_parser import load_config
+        db, db_path = temp_db
+
+        temp_dir = tempfile.mkdtemp()
+        mock_e1_ckpt = os.path.join(temp_dir, "mock_e1.pth")
+        mock_e3_ckpt = os.path.join(temp_dir, "mock_e3.pth")
+
+        cfg_e1 = load_config("./configs/biggan_constrained_baseline_e1.yaml")
+        cfg_e3 = load_config("./configs/vqdm_e3_baseline.yaml")
+
+        model_e1 = create_model(cfg_e1)
+        model_e3 = create_model(cfg_e3)
+
+        torch.save({"model_state_dict": model_e1.state_dict()}, mock_e1_ckpt)
+        torch.save({"model_state_dict": model_e3.state_dict()}, mock_e3_ckpt)
+
+        device = torch.device("cpu")
+        res = run_cross_generator_evaluations(
+            e1_config="./configs/biggan_constrained_baseline_e1.yaml",
+            e1_checkpoint=mock_e1_ckpt,
+            e3_config="./configs/vqdm_e3_baseline.yaml",
+            e3_checkpoint=mock_e3_ckpt,
+            device=device,
+            use_mock=True,
+            save_to_db=True,
+            db_path=db_path
+        )
+
+        assert "e1_to_vqdm" in res
+        assert "e3_to_biggan" in res
+
+        df_metrics = db.query_df("SELECT * FROM metrics WHERE split = 'val_zero_shot'")
+        assert len(df_metrics) == 2
+        for _, row in df_metrics.iterrows():
+            assert row["is_mock"] == 1
+            assert row["is_unseen"] == 1
+            assert row["source_type"] == "mock_fixture"
+
+
 
 
