@@ -448,6 +448,90 @@ class TestExperimentDatabaseAndQueries:
             assert row["accuracy"] == 0.88
             assert row["auroc"] == 0.92
 
+    def test_e4_evaluation_mock_with_db_save(self, temp_db):
+        """Verify that E4 multi-generator evaluation executes with mock data and saves directly to SQLite."""
+        import tempfile
+        import torch
+        from scripts.zero_shot_cross_gen_eval import run_e4_evaluations
+        from src.models import create_model
+        from src.utils.config_parser import load_config
+        db, db_path = temp_db
+
+        temp_dir = tempfile.mkdtemp()
+        mock_e4_ckpt = os.path.join(temp_dir, "mock_e4.pth")
+
+        cfg_e4 = load_config("./configs/multi_generator_biggan_vqdm_e4.yaml")
+        model_e4 = create_model(cfg_e4)
+        torch.save({"model_state_dict": model_e4.state_dict()}, mock_e4_ckpt)
+
+        device = torch.device("cpu")
+        res = run_e4_evaluations(
+            e4_config="./configs/multi_generator_biggan_vqdm_e4.yaml",
+            e4_checkpoint=mock_e4_ckpt,
+            target_generators=["biggan", "vqdm"],
+            max_val_samples=16,
+            device=device,
+            use_mock=True,
+            save_to_db=True,
+            db_path=db_path
+        )
+
+        assert "e4_to_biggan" in res
+        assert "e4_to_vqdm" in res
+
+        # Verify payload details
+        for target in ["biggan", "vqdm"]:
+            r = res[f"e4_to_{target}"]
+            assert r["source_experiment"] == "E4 Multi-Generator Baseline"
+            assert r["source_experiment_id"] == "multi_generator_biggan_vqdm_e4"
+            assert r["target_generator"] == target
+            assert r["is_unseen"] is False
+            assert r["split"] == "val_multigen"
+            for m in ["accuracy", "auroc", "average_precision", "f1", "precision", "recall"]:
+                assert m in r["metrics"]
+
+        # Verify DB records
+        df_metrics = db.query_df("SELECT * FROM metrics WHERE experiment_id = 'multi_generator_biggan_vqdm_e4' AND split = 'val_multigen'")
+        assert len(df_metrics) == 2
+        for _, row in df_metrics.iterrows():
+            assert row["is_mock"] == 1
+            assert row["is_unseen"] == 0
+            assert row["source_type"] == "mock_fixture"
+            assert row["generator_id"] in ["biggan", "vqdm"]
+
+    def test_e4_single_target_evaluation_mock(self, temp_db):
+        """Verify that E4 can evaluate against a single specified target generator."""
+        import tempfile
+        import torch
+        from scripts.zero_shot_cross_gen_eval import run_e4_evaluations
+        from src.models import create_model
+        from src.utils.config_parser import load_config
+        db, db_path = temp_db
+
+        temp_dir = tempfile.mkdtemp()
+        mock_e4_ckpt = os.path.join(temp_dir, "mock_e4.pth")
+
+        cfg_e4 = load_config("./configs/multi_generator_biggan_vqdm_e4.yaml")
+        model_e4 = create_model(cfg_e4)
+        torch.save({"model_state_dict": model_e4.state_dict()}, mock_e4_ckpt)
+
+        device = torch.device("cpu")
+        res = run_e4_evaluations(
+            e4_config="./configs/multi_generator_biggan_vqdm_e4.yaml",
+            e4_checkpoint=mock_e4_ckpt,
+            target_generators=["biggan"],
+            max_val_samples=16,
+            device=device,
+            use_mock=True,
+            save_to_db=True,
+            db_path=db_path
+        )
+
+        assert "e4_to_biggan" in res
+        assert "e4_to_vqdm" not in res
+        assert len(res) == 1
+
+
 
 
 

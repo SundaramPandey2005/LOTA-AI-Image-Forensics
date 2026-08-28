@@ -9,7 +9,7 @@ import os
 import sys
 import re
 import argparse
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import torch
 import torch.nn as nn
@@ -95,11 +95,14 @@ def evaluate_cross_generator_pair(
     checkpoint_path: str,
     data_root: str = "./data/GenImage",
     batch_size: int = 16,
+    max_samples_per_class: Optional[int] = None,
+    split: str = "val_zero_shot",
     device: Optional[torch.device] = None,
     use_mock: bool = False
 ) -> Dict[str, Any]:
     """
-    Loads a model trained on source generator and evaluates zero-shot on target generator validation data.
+    Loads a model from checkpoint and evaluates on target generator validation data.
+    Supports both zero-shot cross-generator and multi-generator evaluations.
     """
     dev = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     cfg = load_config(config_path)
@@ -116,7 +119,7 @@ def evaluate_cross_generator_pair(
     normalization = data_cfg.get("normalization", "thresholding")
     pre_resize_size = data_cfg.get("pre_resize_size", None)
     jpeg_reencode = data_cfg.get("jpeg_reencode_quality", data_cfg.get("jpeg_quality", None))
-    max_val_samples = data_cfg.get("max_val_samples", None)
+    val_sample_limit = max_samples_per_class if max_samples_per_class is not None else data_cfg.get("max_val_samples", None)
 
     eval_ds = GenImageDataset(
         root_dir=data_root,
@@ -128,9 +131,9 @@ def evaluate_cross_generator_pair(
         normalization_method=normalization,
         pre_resize_size=pre_resize_size,
         jpeg_reencode_quality=jpeg_reencode,
-        max_samples_per_class=max_val_samples,
+        max_samples_per_class=val_sample_limit,
         use_mock_data=use_mock,
-        mock_num_samples=32 if use_mock else 64
+        mock_num_samples=(val_sample_limit * 2) if (use_mock and val_sample_limit) else (32 if use_mock else 64)
     )
 
     eval_loader = DataLoader(
@@ -151,10 +154,16 @@ def evaluate_cross_generator_pair(
         arch_name=arch_name
     )
 
+    trained_gens = cfg.get("data", {}).get("generators", cfg.get("generators", [cfg.get("generator", "unknown")]))
+    if isinstance(trained_gens, str):
+        trained_gens = [trained_gens]
+    is_unseen = (target_generator.lower() not in [g.lower() for g in trained_gens])
+    trained_gen_str = "+".join(trained_gens) if len(trained_gens) > 1 else trained_gens[0]
+
     result_payload = {
         "source_experiment": source_name,
         "source_experiment_id": cfg.get("experiment_name", "unknown_exp"),
-        "trained_generator": cfg.get("generator", "unknown"),
+        "trained_generator": trained_gen_str,
         "target_generator": target_generator,
         "checkpoint_path": checkpoint_path,
         "config_path": config_path,
@@ -162,10 +171,10 @@ def evaluate_cross_generator_pair(
         "total_samples": len(eval_ds),
         "real_samples": real_count,
         "fake_samples": fake_count,
-        "split": "val_zero_shot",
+        "split": split,
         "source_type": "mock_fixture" if use_mock else "experimental",
         "is_mock": use_mock,
-        "is_unseen": True,
+        "is_unseen": is_unseen,
         "metrics": metrics
     }
 
@@ -177,8 +186,9 @@ def print_result_block(title: str, res: Dict[str, Any]):
     Nicely formats and prints evaluation result block.
     """
     m = res["metrics"]
+    eval_type = "ZERO-SHOT CROSS-GENERATOR EVALUATION" if res.get("is_unseen", True) else "MULTI-GENERATOR EVALUATION"
     print("=" * 80)
-    print(f"  ZERO-SHOT CROSS-GENERATOR EVALUATION: {title}")
+    print(f"  {eval_type}: {title}")
     print("=" * 80)
     print(f"  Source Model (Trained On) : {res['trained_generator'].upper()} ({res['source_experiment']})")
     print(f"  Target Evaluation Split   : {res['target_generator'].upper()} (Validation Split)")
@@ -193,6 +203,7 @@ def print_result_block(title: str, res: Dict[str, Any]):
     print(f"  Precision                 : {m.get('precision', 0.0):.4f}")
     print(f"  Recall                    : {m.get('recall', 0.0):.4f}")
     print("=" * 80 + "\n")
+
 
 
 def parse_zero_shot_summary_file(summary_path: str = "./experiments/zero_shot_results_summary.txt") -> Dict[str, Any]:
@@ -443,6 +454,86 @@ def record_zero_shot_evaluation_results(
     return True
 
 
+def record_e4_evaluation_results(
+    db_path: str = "./experiments/results/lota_experiments.db",
+    results_dict: Optional[Dict[str, Any]] = None,
+    split: str = "val_multigen"
+) -> bool:
+    """
+    Persistently records E4 multi-generator evaluation results into the SQLite database.
+    Ensures model and experiment records exist and maintains strict idempotency and provenance.
+    """
+    if results_dict is None:
+        raise ValueError("results_dict must be provided to record E4 evaluation results.")
+
+    db = ExperimentDatabase(db_path)
+
+    # 1. Ensure Model Record
+    db.insert_model(
+        model_id="M_NBC_RESNET50",
+        architecture="nbc",
+        backbone="resnet50",
+        patch_size=32,
+        normalization="thresholding",
+        bit_planes="[0, 1, 2]"
+    )
+
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+
+        for key, res in results_dict.items():
+            if not isinstance(res, dict) or "metrics" not in res:
+                continue
+
+            exp_id = res.get("source_experiment_id", "multi_generator_biggan_vqdm_e4")
+            target_gen = res.get("target_generator", "unknown")
+            metrics = res.get("metrics", {})
+            source_type = res.get("source_type", "experimental")
+            is_mock = res.get("is_mock", False)
+            is_unseen = res.get("is_unseen", False)
+
+            # Ensure Experiment Record exists
+            cursor.execute("SELECT experiment_id FROM experiments WHERE experiment_id = ?", (exp_id,))
+            if not cursor.fetchone():
+                e4_cfg = {
+                    "experiment_name": exp_id,
+                    "generators": ["biggan", "vqdm"],
+                    "model": {"architecture": "nbc", "backbone": "resnet50"},
+                    "data": {"image_size": 256, "patch_size": 32, "bit_planes": [0, 1, 2], "normalization": "thresholding"}
+                }
+                db.insert_experiment(
+                    experiment_id=exp_id,
+                    name="E4 Multi-Generator (BigGAN + VQDM) Baseline",
+                    model_id="M_NBC_RESNET50",
+                    architecture="nbc",
+                    config=e4_cfg,
+                    source_type=source_type,
+                    is_mock=is_mock,
+                    status="COMPLETED"
+                )
+
+            # Delete existing metrics for idempotency
+            cursor.execute(
+                "DELETE FROM metrics WHERE experiment_id = ? AND generator_id = ? AND split = ?",
+                (exp_id, target_gen, split)
+            )
+            conn.commit()
+
+            # Insert evaluation metrics
+            db.insert_metrics(
+                experiment_id=exp_id,
+                generator_id=target_gen,
+                metrics=metrics,
+                split=split,
+                source_type=source_type,
+                is_mock=is_mock,
+                is_unseen=is_unseen
+            )
+
+    print(f"[PERSISTENCE SUCCESS] Successfully recorded E4 multi-generator evaluation results to SQLite database ({db_path}).")
+    return True
+
+
 def run_cross_generator_evaluations(
     e1_config: str = "./configs/biggan_constrained_baseline_e1.yaml",
     e1_checkpoint: str = "./checkpoints/biggan_constrained_baseline_e1_best.pth",
@@ -450,6 +541,7 @@ def run_cross_generator_evaluations(
     e3_checkpoint: str = "./checkpoints/vqdm_e3_baseline_best.pth",
     data_root: str = "./data/GenImage",
     batch_size: int = 16,
+    max_val_samples: Optional[int] = None,
     device: Optional[torch.device] = None,
     use_mock: bool = False,
     save_to_db: bool = False,
@@ -475,6 +567,8 @@ def run_cross_generator_evaluations(
         checkpoint_path=e1_checkpoint,
         data_root=data_root,
         batch_size=batch_size,
+        max_samples_per_class=max_val_samples,
+        split="val_zero_shot",
         device=dev,
         use_mock=use_mock
     )
@@ -490,6 +584,8 @@ def run_cross_generator_evaluations(
         checkpoint_path=e3_checkpoint,
         data_root=data_root,
         batch_size=batch_size,
+        max_samples_per_class=max_val_samples,
+        split="val_zero_shot",
         device=dev,
         use_mock=use_mock
     )
@@ -506,12 +602,77 @@ def run_cross_generator_evaluations(
     return results
 
 
+def run_e4_evaluations(
+    e4_config: str = "./configs/multi_generator_biggan_vqdm_e4.yaml",
+    e4_checkpoint: str = "./checkpoints/multi_generator_biggan_vqdm_e4_best.pth",
+    target_generators: Optional[List[str]] = None,
+    data_root: str = "./data/GenImage",
+    batch_size: int = 16,
+    max_val_samples: int = 100,
+    device: Optional[torch.device] = None,
+    use_mock: bool = False,
+    save_to_db: bool = False,
+    db_path: str = "./experiments/results/lota_experiments.db",
+    split: str = "val_multigen"
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Executes E4 multi-generator evaluations on target generators (default: BigGAN and VQDM validation data).
+    Each target validation set consists of 100 real + 100 fake = 200 images.
+    Optionally persists results directly into the SQLite database.
+    """
+    dev = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    targets = target_generators or ["biggan", "vqdm"]
+    print(f"\n[EVALUATION START] Initializing E4 Multi-Generator Evaluations on device: {dev}")
+    print(f"  E4 Config        : {e4_config}")
+    print(f"  E4 Checkpoint    : {e4_checkpoint}")
+    print(f"  Target Generators: {[t.upper() for t in targets]}")
+    print(f"  Samples Per Class: {max_val_samples} ({max_val_samples * 2} per target)")
+
+    results = {}
+    for idx, target in enumerate(targets, 1):
+        key = f"e4_to_{target}"
+        print(f"\n[RUNNING {idx}/{len(targets)}] Evaluating E4 Multi-Generator model on {target.upper()} validation data...")
+        res = evaluate_cross_generator_pair(
+            source_name="E4 Multi-Generator Baseline",
+            target_generator=target,
+            config_path=e4_config,
+            checkpoint_path=e4_checkpoint,
+            data_root=data_root,
+            batch_size=batch_size,
+            max_samples_per_class=max_val_samples,
+            split=split,
+            device=dev,
+            use_mock=use_mock
+        )
+        print_result_block(f"E4 Multi-Generator -> {target.upper()}", res)
+        results[key] = res
+
+    if save_to_db:
+        record_e4_evaluation_results(
+            db_path=db_path,
+            results_dict=results,
+            split=split
+        )
+
+    return results
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Zero-Shot Cross-Generator Evaluation (E1 BigGAN <-> E3 VQDM)")
+    parser = argparse.ArgumentParser(description="Cross-Generator & Multi-Generator Evaluation (E1, E3, E4)")
+    # E1 & E3 options
     parser.add_argument("--e1-config", type=str, default="./configs/biggan_constrained_baseline_e1.yaml", help="Path to E1 config YAML")
     parser.add_argument("--e1-checkpoint", type=str, default="./checkpoints/biggan_constrained_baseline_e1_best.pth", help="Path to E1 checkpoint .pth")
     parser.add_argument("--e3-config", type=str, default="./configs/vqdm_e3_baseline.yaml", help="Path to E3 config YAML")
     parser.add_argument("--e3-checkpoint", type=str, default="./checkpoints/vqdm_e3_baseline_best.pth", help="Path to E3 checkpoint .pth")
+
+    # E4 options
+    parser.add_argument("--eval-e4", action="store_true", help="Execute E4 multi-generator evaluation")
+    parser.add_argument("--e4-config", type=str, default="./configs/multi_generator_biggan_vqdm_e4.yaml", help="Path to E4 config YAML")
+    parser.add_argument("--e4-checkpoint", type=str, default="./checkpoints/multi_generator_biggan_vqdm_e4_best.pth", help="Path to E4 checkpoint .pth")
+    parser.add_argument("--eval-target", type=str, default=None, choices=["biggan", "vqdm"], help="Specific target generator to evaluate against (e.g. biggan or vqdm)")
+    parser.add_argument("--max-val-samples", type=int, default=100, help="Max real/fake samples per class for validation evaluation (default 100 -> 200 total)")
+
+    # General options
     parser.add_argument("--data-root", type=str, default="./data/GenImage", help="Root directory of GenImage dataset")
     parser.add_argument("--batch-size", type=int, default=16, help="Evaluation batch size")
     parser.add_argument("--mock", action="store_true", help="Use synthetic mock data for test/CI validation")
@@ -531,19 +692,35 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    run_cross_generator_evaluations(
-        e1_config=args.e1_config,
-        e1_checkpoint=args.e1_checkpoint,
-        e3_config=args.e3_config,
-        e3_checkpoint=args.e3_checkpoint,
-        data_root=args.data_root,
-        batch_size=args.batch_size,
-        device=device,
-        use_mock=args.mock,
-        save_to_db=args.save_db,
-        db_path=args.db_path
-    )
+    if args.eval_e4:
+        target_gens = [args.eval_target] if args.eval_target else ["biggan", "vqdm"]
+        run_e4_evaluations(
+            e4_config=args.e4_config,
+            e4_checkpoint=args.e4_checkpoint,
+            target_generators=target_gens,
+            data_root=args.data_root,
+            batch_size=args.batch_size,
+            max_val_samples=args.max_val_samples,
+            device=device,
+            use_mock=args.mock,
+            save_to_db=args.save_db,
+            db_path=args.db_path
+        )
+    else:
+        run_cross_generator_evaluations(
+            e1_config=args.e1_config,
+            e1_checkpoint=args.e1_checkpoint,
+            e3_config=args.e3_config,
+            e3_checkpoint=args.e3_checkpoint,
+            data_root=args.data_root,
+            batch_size=args.batch_size,
+            device=device,
+            use_mock=args.mock,
+            save_to_db=args.save_db,
+            db_path=args.db_path
+        )
 
 
 if __name__ == "__main__":
     main()
+
