@@ -1,6 +1,8 @@
+import os
 import pytest
 import torch
 from torch.utils.data import DataLoader
+
 
 from src.data.dataset import GenImageDataset, GenImageForensicDataset, create_dataloader
 from src.data.preprocessing import (
@@ -209,4 +211,180 @@ class TestDataModule:
 
         ds_q95 = GenImageDataset(root_dir="./data/GenImage", jpeg_reencode_quality=95, use_mock_data=True)
         assert ds_q95.jpeg_reencode_quality == 95
+
+    def test_e4_config_validity_and_consistency(self):
+        """Verify E4 multi-generator config exists and matches E1/E3 architecture and training parameters."""
+        import os
+        import yaml
+
+        e4_path = "configs/multi_generator_biggan_vqdm_e4.yaml"
+        e1_path = "configs/biggan_constrained_baseline_e1.yaml"
+        e3_path = "configs/vqdm_e3_baseline.yaml"
+
+        assert os.path.exists(e4_path), f"E4 config file not found at {e4_path}"
+        assert os.path.exists(e1_path), f"E1 config file not found at {e1_path}"
+        assert os.path.exists(e3_path), f"E3 config file not found at {e3_path}"
+
+        with open(e4_path, "r") as f:
+            cfg_e4 = yaml.safe_load(f)
+        with open(e1_path, "r") as f:
+            cfg_e1 = yaml.safe_load(f)
+        with open(e3_path, "r") as f:
+            cfg_e3 = yaml.safe_load(f)
+
+        assert cfg_e4["experiment_name"] == "multi_generator_biggan_vqdm_e4"
+        assert cfg_e4["data"]["generators"] == ["biggan", "vqdm"]
+        assert cfg_e4["data"]["max_real_samples_per_generator"] == 250
+        assert cfg_e4["data"]["max_fake_samples_per_generator"] == 250
+        assert cfg_e4["data"]["max_real_samples"] == 500
+        assert cfg_e4["data"]["max_fake_samples"] == 500
+
+        # Verify model architecture parity with E1 and E3
+        for k in ["architecture", "backbone", "pretrained", "num_classes"]:
+            assert cfg_e4["model"][k] == cfg_e1["model"][k]
+            assert cfg_e4["model"][k] == cfg_e3["model"][k]
+
+        # Verify training hyperparameter parity with E1 and E3
+        for k in ["batch_size", "epochs", "learning_rate", "weight_decay", "optimizer", "mixed_precision"]:
+            assert cfg_e4["training"][k] == cfg_e1["training"][k]
+            assert cfg_e4["training"][k] == cfg_e3["training"][k]
+
+        # Verify reproducibility parity
+        assert cfg_e4["reproducibility"]["seed"] == 42
+        assert cfg_e4["reproducibility"]["deterministic"] is True
+
+    def test_e4_mock_dataset_balanced_composition(self):
+        """Verify E4 mock dataset produces exactly 1000 samples with 250 from each of the four categories."""
+        from src.data.splits import get_multigen_category_counts
+
+        ds = GenImageDataset(
+            root_dir="./data/GenImage",
+            generators=["biggan", "vqdm"],
+            split="train",
+            use_mock_data=True,
+            mock_num_samples=1000,
+        )
+
+        assert len(ds) == 1000
+        counts = get_multigen_category_counts(ds)
+
+        assert counts["biggan"]["real"] == 250
+        assert counts["biggan"]["fake"] == 250
+        assert counts["vqdm"]["real"] == 250
+        assert counts["vqdm"]["fake"] == 250
+
+        # Verify total real and fake
+        total_real = sum(1 for s in ds.samples if s[1] == 0.0)
+        total_fake = sum(1 for s in ds.samples if s[1] == 1.0)
+        assert total_real == 500
+        assert total_fake == 500
+
+    def test_e4_filesystem_dataset_composition_and_determinism(self):
+        """Verify real-data discovery selects exactly 250 samples per category deterministically."""
+        import tempfile
+        from PIL import Image
+        from src.data.splits import get_multigen_category_counts
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = os.path.join(tmp_dir, "GenImage")
+            # Populate mock directory structure with 500 real + 500 fake for BigGAN and VQDM (2000 files)
+            for gen in ["biggan", "vqdm"]:
+                for cat, label_dir in [("nature", "nature"), ("ai", "ai")]:
+                    p = os.path.join(root, gen, "train", label_dir)
+                    os.makedirs(p, exist_ok=True)
+                    for i in range(500):
+                        img = Image.new("RGB", (32, 32), color=(i % 256, (i * 3) % 256, (i * 7) % 256))
+                        img.save(os.path.join(p, f"img_{i:04d}.png"))
+
+            # Load with max_samples_per_class=250 for ["biggan", "vqdm"]
+            ds1 = GenImageDataset(
+                root_dir=root,
+                generators=["biggan", "vqdm"],
+                split="train",
+                max_samples_per_class=250,
+                use_mock_data=False,
+                extract_forensics_on_the_fly=False
+            )
+
+            assert len(ds1) == 1000
+            counts = get_multigen_category_counts(ds1)
+            assert counts["biggan"]["real"] == 250
+            assert counts["biggan"]["fake"] == 250
+            assert counts["vqdm"]["real"] == 250
+            assert counts["vqdm"]["fake"] == 250
+
+            # Verify determinism: repeated discovery yields identical sample paths and order
+            ds2 = GenImageDataset(
+                root_dir=root,
+                generators=["biggan", "vqdm"],
+                split="train",
+                max_samples_per_class=250,
+                use_mock_data=False,
+                extract_forensics_on_the_fly=False
+            )
+            assert ds1.samples == ds2.samples
+
+    def test_e1_and_e3_dataset_behavior_unchanged(self):
+        """Verify that single-generator baselines (E1 BigGAN, E3 VQDM) maintain exact 500/500 composition."""
+        import tempfile
+        from PIL import Image
+        from src.data.splits import get_multigen_category_counts
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = os.path.join(tmp_dir, "GenImage")
+            for gen in ["biggan", "vqdm"]:
+                for cat, label_dir in [("nature", "nature"), ("ai", "ai")]:
+                    p = os.path.join(root, gen, "train", label_dir)
+                    os.makedirs(p, exist_ok=True)
+                    for i in range(500):
+                        img = Image.new("RGB", (32, 32), color=(i % 256, 100, 100))
+                        img.save(os.path.join(p, f"img_{i:04d}.png"))
+
+            # E1 BigGAN-only
+            ds_e1 = GenImageDataset(
+                root_dir=root,
+                generators=["biggan"],
+                split="train",
+                max_samples_per_class=500,
+                use_mock_data=False,
+                extract_forensics_on_the_fly=False
+            )
+            assert len(ds_e1) == 1000
+            counts_e1 = get_multigen_category_counts(ds_e1)
+            assert counts_e1["biggan"]["real"] == 500
+            assert counts_e1["biggan"]["fake"] == 500
+            assert "vqdm" not in counts_e1
+
+            # E3 VQDM-only
+            ds_e3 = GenImageDataset(
+                root_dir=root,
+                generators=["vqdm"],
+                split="train",
+                max_samples_per_class=500,
+                use_mock_data=False,
+                extract_forensics_on_the_fly=False
+            )
+            assert len(ds_e3) == 1000
+            counts_e3 = get_multigen_category_counts(ds_e3)
+            assert counts_e3["vqdm"]["real"] == 500
+            assert counts_e3["vqdm"]["fake"] == 500
+            assert "biggan" not in counts_e3
+
+    def test_create_balanced_multigen_samples_helper(self):
+        """Verify create_balanced_multigen_samples helper returns exactly balanced quotas."""
+        from src.data.splits import create_balanced_multigen_samples, get_multigen_category_counts
+
+        samples = create_balanced_multigen_samples(
+            generators=["biggan", "vqdm"],
+            samples_per_generator_class=250,
+            use_mock_data=True
+        )
+
+        assert len(samples) == 1000
+        counts = get_multigen_category_counts(samples)
+        assert counts["biggan"]["real"] == 250
+        assert counts["biggan"]["fake"] == 250
+        assert counts["vqdm"]["real"] == 250
+        assert counts["vqdm"]["fake"] == 250
+
 

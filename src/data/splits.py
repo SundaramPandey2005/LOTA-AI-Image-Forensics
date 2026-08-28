@@ -126,3 +126,72 @@ def create_logo_splits(
     held_out_test_samples = all_generator_samples.get(excluded_generator, [])
 
     return train_samples, val_samples, held_out_test_samples
+
+
+def create_balanced_multigen_samples(
+    root_dir: str = "./data/GenImage",
+    generators: Optional[List[str]] = None,
+    samples_per_generator_class: int = 250,
+    split: str = "train",
+    seed: int = 42,
+    use_mock_data: bool = False
+) -> List[Dict[str, Any]]:
+    """
+    Deterministically builds a balanced multi-generator sample list with exact quotas per category:
+    For N generators, selects exactly `samples_per_generator_class` real (label 0) and fake (label 1)
+    images per generator. Total samples = N * 2 * samples_per_generator_class.
+    """
+    gens = generators or ["biggan", "vqdm"]
+    all_samples: List[Dict[str, Any]] = []
+
+    if use_mock_data:
+        for gen in gens:
+            for i in range(samples_per_generator_class):
+                all_samples.append({"path": f"mock_{gen}_{split}_real_{i}.png", "label": 0, "generator": gen})
+            for i in range(samples_per_generator_class):
+                all_samples.append({"path": f"mock_{gen}_{split}_fake_{i}.png", "label": 1, "generator": gen})
+        return all_samples
+
+    for gen in gens:
+        gen_dir = os.path.join(root_dir, gen, split)
+        if not os.path.exists(gen_dir):
+            gen_dir = os.path.join(root_dir, gen)
+        gen_samples = scan_generator_directory(
+            generator_dir=gen_dir,
+            generator_name=gen,
+            max_samples_per_class=samples_per_generator_class
+        )
+        all_samples.extend(gen_samples)
+
+    return all_samples
+
+
+def get_multigen_category_counts(
+    dataset_or_samples: Any
+) -> Dict[str, Dict[str, int]]:
+    """
+    Calculates the exact breakdown of samples by generator and class category (real vs fake).
+    """
+    if hasattr(dataset_or_samples, "samples"):
+        raw_list = dataset_or_samples.samples
+    else:
+        raw_list = dataset_or_samples
+
+    counts: Dict[str, Dict[str, int]] = {}
+    for item in raw_list:
+        if isinstance(item, dict):
+            gen = item.get("generator", "unknown")
+            label = int(item.get("label", 0))
+        elif isinstance(item, (tuple, list)):
+            gen = item[2] if len(item) > 2 else "unknown"
+            label = int(item[1])
+        else:
+            continue
+
+        if gen not in counts:
+            counts[gen] = {"real": 0, "fake": 0}
+        cat = "real" if label == 0 else "fake"
+        counts[gen][cat] += 1
+
+    return counts
+

@@ -1,0 +1,39 @@
+# E4 — Multi-Generator (BigGAN + VQDM) Controlled Experiment Configuration
+experiment_name: "multi_generator_biggan_vqdm_e4"
+generators: ["biggan", "vqdm"]
+generator: "multi_generator"
+
+data:
+  root_dir: "./data/GenImage"
+  generators: ["biggan", "vqdm"]
+  use_mock_data: false
+  require_exact_sample_counts: true
+  train_val_ratio: 0.7
+  max_real_samples: 500
+  max_fake_samples: 500
+  max_real_samples_per_generator: 250
+  max_fake_samples_per_generator: 250
+  max_samples_per_class: 250
+  image_size: 256
+  patch_size: 32
+  bit_planes: [0, 1, 2]
+  normalization: "thresholding"
+
+model:
+  architecture: "nbc"
+  backbone: "resnet50"
+  pretrained: true
+  num_classes: 1
+
+training:
+  batch_size: 16
+  epochs: 15
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  optimizer: "adam"
+  mixed_precision: true
+  checkpoint_dir: "./checkpoints"
+
+reproducibility:
+  seed: 42
+  deterministic: true

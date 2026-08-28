@@ -35,7 +35,8 @@ class GenImageDataset(Dataset):
         pre_resize_size: Optional[int] = None,
         jpeg_reencode_quality: Optional[int] = None,
         jpeg_quality: Optional[int] = None,
-        max_samples_per_class: Optional[int] = None,
+        max_samples_per_class: Optional[Union[int, Dict[str, Any]]] = None,
+        max_samples_per_generator_class: Optional[int] = None,
         extract_forensics_on_the_fly: bool = True,
         bit_planes: Optional[List[int]] = None,
         bit_indices: Optional[List[int]] = None,
@@ -61,6 +62,8 @@ class GenImageDataset(Dataset):
         self.patch_size = patch_size
         self.patch_selection_strategy = patch_strategy or patch_selection_strategy or "max_gradient"
         self.use_mock_data = use_mock_data
+        self.max_samples_per_class = max_samples_per_class
+        self.max_samples_per_generator_class = max_samples_per_generator_class
 
         self.samples: List[Tuple[str, float, str]] = []
 
@@ -70,10 +73,17 @@ class GenImageDataset(Dataset):
                 self.samples.append((s["path"], float(s["label"]), s.get("generator", "unknown")))
         elif self.use_mock_data:
             # Explicit mock mode for infrastructure/CI testing
-            for i in range(mock_num_samples):
-                gen = self.generators[i % len(self.generators)]
-                label = float(i % 2)
-                self.samples.append((f"mock_{gen}_{split}_{i}.png", label, gen))
+            # When mock_num_samples is specified, evenly divide across generators
+            # ensuring balanced real (0.0) and fake (1.0) samples per generator
+            samples_per_gen = mock_num_samples // len(self.generators)
+            for gen in self.generators:
+                for i in range(samples_per_gen):
+                    label = float(i % 2)
+                    self.samples.append((f"mock_{gen}_{split}_{i}.png", label, gen))
+            remainder = mock_num_samples % len(self.generators)
+            for j in range(remainder):
+                gen = self.generators[j]
+                self.samples.append((f"mock_{gen}_{split}_{samples_per_gen + j}.png", float(j % 2), gen))
         else:
             # Real dataset mode: must exist and have samples
             if not os.path.exists(root_dir):
@@ -82,9 +92,10 @@ class GenImageDataset(Dataset):
                     f"Real-data training cannot proceed without legitimate image files.\n"
                     f"If you intentionally wish to test software infrastructure with synthetic data, set use_mock_data=True."
                 )
-            self._discover_samples(max_samples_per_class)
+            quota = max_samples_per_generator_class if max_samples_per_generator_class is not None else max_samples_per_class
+            self._discover_samples(quota)
 
-    def _discover_samples(self, max_samples_per_class: Optional[int]):
+    def _discover_samples(self, max_samples_per_class: Optional[Union[int, Dict[str, Any]]]):
         real_exts = ("*.jpg", "*.jpeg", "*.png", "*.webp", "*.JPG", "*.JPEG", "*.PNG", "*.WEBP")
         discovered_by_gen = {}
         seen_files = set()
@@ -114,8 +125,26 @@ class GenImageDataset(Dataset):
                                         class_files.append(fp)
 
                 class_files = sorted(list(set(class_files)))
-                if max_samples_per_class is not None and max_samples_per_class > 0:
-                    class_files = class_files[:max_samples_per_class]
+
+                # Determine limit for this generator and class
+                limit = None
+                if isinstance(max_samples_per_class, int):
+                    limit = max_samples_per_class
+                elif isinstance(max_samples_per_class, dict):
+                    if gen in max_samples_per_class and isinstance(max_samples_per_class[gen], dict):
+                        k = "nature" if label_val == 0.0 else "ai"
+                        limit = max_samples_per_class[gen].get(k, max_samples_per_class[gen].get("real" if label_val == 0.0 else "fake"))
+                    elif gen in max_samples_per_class:
+                        limit = max_samples_per_class[gen]
+                    elif "real" in max_samples_per_class or "fake" in max_samples_per_class:
+                        k = "real" if label_val == 0.0 else "fake"
+                        limit = max_samples_per_class.get(k)
+                    elif "nature" in max_samples_per_class or "ai" in max_samples_per_class:
+                        k = "nature" if label_val == 0.0 else "ai"
+                        limit = max_samples_per_class.get(k)
+
+                if limit is not None and limit > 0:
+                    class_files = class_files[:limit]
 
                 key = "nature" if label_val == 0.0 else "ai"
                 discovered_by_gen[gen][key] = len(class_files)

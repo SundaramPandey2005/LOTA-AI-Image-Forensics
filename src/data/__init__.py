@@ -16,6 +16,8 @@ from .splits import (
     scan_generator_directory,
     create_stratified_split,
     create_logo_splits,
+    create_balanced_multigen_samples,
+    get_multigen_category_counts,
     LOGOPartitionManager,
 )
 
@@ -37,5 +39,8 @@ __all__ = [
     "scan_generator_directory",
     "create_stratified_split",
     "create_logo_splits",
+    "create_balanced_multigen_samples",
+    "get_multigen_category_counts",
     "LOGOPartitionManager",
 ]
+

@@ -403,6 +403,52 @@ class TestExperimentDatabaseAndQueries:
             assert row["is_unseen"] == 1
             assert row["source_type"] == "mock_fixture"
 
+    def test_e4_multi_generator_db_logging_and_provenance(self, temp_db):
+        """Verify that E4 multi-generator experiment is logged with source_type='experimental' and is_mock=0."""
+        _, db_path = temp_db
+        logger = ExperimentLogger(db_path)
+
+        e4_metrics = {
+            "accuracy": 0.88,
+            "auroc": 0.92,
+            "average_precision": 0.91,
+            "f1": 0.87,
+            "precision": 0.89,
+            "recall": 0.85
+        }
+
+        logger.log_run(
+            experiment_id="multi_generator_biggan_vqdm_e4",
+            name="E4 Multi-Generator (BigGAN + VQDM) Baseline",
+            config={"data": {"generators": ["biggan", "vqdm"], "samples_per_generator_class": 250}},
+            model_id="M_NBC_RESNET50",
+            metrics_by_generator={
+                "multi_generator": e4_metrics,
+                "biggan": e4_metrics,
+                "vqdm": e4_metrics
+            },
+            split="val_best",
+            source_type="experimental",
+            is_mock=False,
+            training_time_sec=120.0
+        )
+
+        db = ExperimentDatabase(db_path)
+        df_exp = db.query_df("SELECT * FROM experiments WHERE experiment_id = 'multi_generator_biggan_vqdm_e4'")
+        assert len(df_exp) == 1
+        assert df_exp.iloc[0]["source_type"] == "experimental"
+        assert df_exp.iloc[0]["is_mock"] == 0
+        assert df_exp.iloc[0]["status"] == "COMPLETED"
+
+        df_metrics = db.query_df("SELECT * FROM metrics WHERE experiment_id = 'multi_generator_biggan_vqdm_e4'")
+        assert len(df_metrics) == 3
+        for _, row in df_metrics.iterrows():
+            assert row["source_type"] == "experimental"
+            assert row["is_mock"] == 0
+            assert row["accuracy"] == 0.88
+            assert row["auroc"] == 0.92
+
+
 
 
 

@@ -46,7 +46,16 @@ def run_real_data_pilot(
         }
 
     dataset_root = cfg["data"].get("root_dir", "./data/GenImage")
-    gen_name = cfg.get("generator", "biggan")
+    gen_config = cfg["data"].get("generators", cfg.get("generators", cfg.get("generator", "biggan")))
+    if isinstance(gen_config, list):
+        generators = gen_config
+        is_multi_gen = len(generators) > 1
+        gen_name = "_".join(generators) if is_multi_gen else generators[0]
+    else:
+        generators = [gen_config]
+        gen_name = gen_config
+        is_multi_gen = False
+
     exp_id = cfg.get("experiment_name", f"real_data_pilot_{gen_name}")
     use_mock = cfg["data"].get("use_mock_data", False)
 
@@ -71,86 +80,47 @@ def run_real_data_pilot(
     # 2. Load Real Dataset
     print("\n[DATASET LOADING] Initializing real GenImage dataset...")
     try:
-        train_exists = os.path.exists(os.path.join(dataset_root, gen_name, "train"))
-        val_exists = os.path.exists(os.path.join(dataset_root, gen_name, "val"))
-
         require_exact = cfg["data"].get("require_exact_sample_counts", False)
         req_real = cfg["data"].get("max_real_samples", None)
         req_fake = cfg["data"].get("max_fake_samples", None)
         pre_resize = cfg["data"].get("pre_resize_size", None)
         jpeg_reencode = cfg["data"].get("jpeg_reencode_quality", cfg["data"].get("jpeg_quality", None))
 
-        if train_exists and val_exists:
-            train_ds = GenImageDataset(
-                root_dir=dataset_root,
-                generators=[gen_name],
-                split="train",
-                max_samples_per_class=req_real,
-                pre_resize_size=pre_resize,
-                jpeg_reencode_quality=jpeg_reencode,
-                use_mock_data=False
-            )
-            val_ds = GenImageDataset(
-                root_dir=dataset_root,
-                generators=[gen_name],
-                split="val",
-                max_samples_per_class=cfg["data"].get("max_val_samples", req_real),
-                pre_resize_size=pre_resize,
-                jpeg_reencode_quality=jpeg_reencode,
-                use_mock_data=False
-            )
-            total_real_samples = sum(1 for s in train_ds.samples if s[1] == 0) + sum(1 for s in val_ds.samples if s[1] == 0)
-            total_fake_samples = sum(1 for s in train_ds.samples if s[1] == 1) + sum(1 for s in val_ds.samples if s[1] == 1)
-        else:
-            # Handle minimal single-split dataset (e.g. biggan/val with nature and ai)
-            active_split = "val" if val_exists else "train"
-            base_ds = GenImageDataset(
-                root_dir=dataset_root,
-                generators=[gen_name],
-                split=active_split,
-                pre_resize_size=pre_resize,
-                jpeg_reencode_quality=jpeg_reencode,
-                use_mock_data=False
-            )
-            total_real_samples = sum(1 for s in base_ds.samples if s[1] == 0)
-            total_fake_samples = sum(1 for s in base_ds.samples if s[1] == 1)
-
-            # Strict verification of required sample counts before proceeding to training
-            if require_exact:
-                err_msgs = []
-                if req_real is not None and total_real_samples < req_real:
-                    err_msgs.append(f"Genuine (nature) images: {total_real_samples} available, {req_real} required (max_real_samples)")
-                if req_fake is not None and total_fake_samples < req_fake:
-                    err_msgs.append(f"AI generated images: {total_fake_samples} available, {req_fake} required (max_fake_samples)")
-                if err_msgs:
-                    print("\n" + "=" * 75)
-                    print("  [RESEARCH INTEGRITY ERROR] INSUFFICIENT SAMPLES FOR CONSTRAINED BASELINE")
-                    print("=" * 75)
-                    print(f"  Experiment '{exp_id}' requires strict minimum dataset counts (require_exact_sample_counts=True).")
-                    for msg in err_msgs:
-                        print(f"  - {msg}")
-                    print(f"\n  Available in '{os.path.join(dataset_root, gen_name)}':")
-                    print(f"    - Genuine (nature) samples : {total_real_samples}")
-                    print(f"    - AI generated samples     : {total_fake_samples}")
-                    print("\n  Aborting execution before training to prevent running an undersized experiment.")
-                    print("=" * 75 + "\n")
-                    raise RuntimeError(
-                        f"Experiment '{exp_id}' aborted: Insufficient samples for required dataset constraint. "
-                        f"Available: ({total_real_samples} real, {total_fake_samples} fake). "
-                        f"Required: ({req_real} real, {req_fake} fake)."
-                    )
-
-            # Cap samples if max_samples specified
+        if is_multi_gen:
+            req_real_per_gen = cfg["data"].get("max_real_samples_per_generator", (req_real // len(generators)) if req_real else 250)
+            req_fake_per_gen = cfg["data"].get("max_fake_samples_per_generator", (req_fake // len(generators)) if req_fake else 250)
             raw_samples = []
-            real_count, fake_count = 0, 0
-            for s in base_ds.samples:
-                lbl = int(s[1])
-                if lbl == 0 and (req_real is None or real_count < req_real):
-                    raw_samples.append({"path": s[0], "label": 0, "generator": s[2]})
-                    real_count += 1
-                elif lbl == 1 and (req_fake is None or fake_count < req_fake):
-                    raw_samples.append({"path": s[0], "label": 1, "generator": s[2]})
-                    fake_count += 1
+            for g in generators:
+                train_g_dir = os.path.join(dataset_root, g, "train")
+                val_g_dir = os.path.join(dataset_root, g, "val")
+                active_split = "train" if os.path.exists(train_g_dir) else ("val" if os.path.exists(val_g_dir) else "train")
+
+                g_base_ds = GenImageDataset(
+                    root_dir=dataset_root,
+                    generators=[g],
+                    split=active_split,
+                    pre_resize_size=pre_resize,
+                    jpeg_reencode_quality=jpeg_reencode,
+                    use_mock_data=False
+                )
+                g_reals = [s for s in g_base_ds.samples if s[1] == 0]
+                g_fakes = [s for s in g_base_ds.samples if s[1] == 1]
+
+                if require_exact:
+                    if len(g_reals) < req_real_per_gen or len(g_fakes) < req_fake_per_gen:
+                        raise RuntimeError(
+                            f"Insufficient samples for generator '{g}': "
+                            f"Available ({len(g_reals)} real, {len(g_fakes)} fake), "
+                            f"Required ({req_real_per_gen} real, {req_fake_per_gen} fake)."
+                        )
+
+                selected_reals = g_reals[:req_real_per_gen] if req_real_per_gen else g_reals
+                selected_fakes = g_fakes[:req_fake_per_gen] if req_fake_per_gen else g_fakes
+
+                for s in selected_reals:
+                    raw_samples.append({"path": s[0], "label": 0, "generator": g})
+                for s in selected_fakes:
+                    raw_samples.append({"path": s[0], "label": 1, "generator": g})
 
             train_samples, val_samples = create_stratified_split(
                 raw_samples,
@@ -159,7 +129,7 @@ def run_real_data_pilot(
             )
             train_ds = GenImageDataset(
                 root_dir=dataset_root,
-                generators=[gen_name],
+                generators=generators,
                 samples=train_samples,
                 pre_resize_size=pre_resize,
                 jpeg_reencode_quality=jpeg_reencode,
@@ -167,26 +137,123 @@ def run_real_data_pilot(
             )
             val_ds = GenImageDataset(
                 root_dir=dataset_root,
-                generators=[gen_name],
+                generators=generators,
                 samples=val_samples,
                 pre_resize_size=pre_resize,
                 jpeg_reencode_quality=jpeg_reencode,
                 use_mock_data=False
             )
+        else:
+            train_exists = os.path.exists(os.path.join(dataset_root, gen_name, "train"))
+            val_exists = os.path.exists(os.path.join(dataset_root, gen_name, "val"))
 
-        # In case require_exact was enabled on dual-split folder
-        if require_exact and (train_exists and val_exists):
-            err_msgs = []
-            if req_real is not None and total_real_samples < req_real:
-                err_msgs.append(f"Genuine (nature) images: {total_real_samples} available, {req_real} required (max_real_samples)")
-            if req_fake is not None and total_fake_samples < req_fake:
-                err_msgs.append(f"AI generated images: {total_fake_samples} available, {req_fake} required (max_fake_samples)")
-            if err_msgs:
-                raise RuntimeError(
-                    f"Experiment '{exp_id}' aborted: Insufficient samples for required dataset constraint. "
-                    f"Available: ({total_real_samples} real, {total_fake_samples} fake). "
-                    f"Required: ({req_real} real, {req_fake} fake)."
+            if train_exists and val_exists:
+                train_ds = GenImageDataset(
+                    root_dir=dataset_root,
+                    generators=[gen_name],
+                    split="train",
+                    max_samples_per_class=req_real,
+                    pre_resize_size=pre_resize,
+                    jpeg_reencode_quality=jpeg_reencode,
+                    use_mock_data=False
                 )
+                val_ds = GenImageDataset(
+                    root_dir=dataset_root,
+                    generators=[gen_name],
+                    split="val",
+                    max_samples_per_class=cfg["data"].get("max_val_samples", req_real),
+                    pre_resize_size=pre_resize,
+                    jpeg_reencode_quality=jpeg_reencode,
+                    use_mock_data=False
+                )
+                total_real_samples = sum(1 for s in train_ds.samples if s[1] == 0) + sum(1 for s in val_ds.samples if s[1] == 0)
+                total_fake_samples = sum(1 for s in train_ds.samples if s[1] == 1) + sum(1 for s in val_ds.samples if s[1] == 1)
+            else:
+                # Handle minimal single-split dataset (e.g. biggan/val with nature and ai)
+                active_split = "val" if val_exists else "train"
+                base_ds = GenImageDataset(
+                    root_dir=dataset_root,
+                    generators=[gen_name],
+                    split=active_split,
+                    pre_resize_size=pre_resize,
+                    jpeg_reencode_quality=jpeg_reencode,
+                    use_mock_data=False
+                )
+                total_real_samples = sum(1 for s in base_ds.samples if s[1] == 0)
+                total_fake_samples = sum(1 for s in base_ds.samples if s[1] == 1)
+
+                # Strict verification of required sample counts before proceeding to training
+                if require_exact:
+                    err_msgs = []
+                    if req_real is not None and total_real_samples < req_real:
+                        err_msgs.append(f"Genuine (nature) images: {total_real_samples} available, {req_real} required (max_real_samples)")
+                    if req_fake is not None and total_fake_samples < req_fake:
+                        err_msgs.append(f"AI generated images: {total_fake_samples} available, {req_fake} required (max_fake_samples)")
+                    if err_msgs:
+                        print("\n" + "=" * 75)
+                        print("  [RESEARCH INTEGRITY ERROR] INSUFFICIENT SAMPLES FOR CONSTRAINED BASELINE")
+                        print("=" * 75)
+                        print(f"  Experiment '{exp_id}' requires strict minimum dataset counts (require_exact_sample_counts=True).")
+                        for msg in err_msgs:
+                            print(f"  - {msg}")
+                        print(f"\n  Available in '{os.path.join(dataset_root, gen_name)}':")
+                        print(f"    - Genuine (nature) samples : {total_real_samples}")
+                        print(f"    - AI generated samples     : {total_fake_samples}")
+                        print("\n  Aborting execution before training to prevent running an undersized experiment.")
+                        print("=" * 75 + "\n")
+                        raise RuntimeError(
+                            f"Experiment '{exp_id}' aborted: Insufficient samples for required dataset constraint. "
+                            f"Available: ({total_real_samples} real, {total_fake_samples} fake). "
+                            f"Required: ({req_real} real, {req_fake} fake)."
+                        )
+
+                # Cap samples if max_samples specified
+                raw_samples = []
+                real_count, fake_count = 0, 0
+                for s in base_ds.samples:
+                    lbl = int(s[1])
+                    if lbl == 0 and (req_real is None or real_count < req_real):
+                        raw_samples.append({"path": s[0], "label": 0, "generator": s[2]})
+                        real_count += 1
+                    elif lbl == 1 and (req_fake is None or fake_count < req_fake):
+                        raw_samples.append({"path": s[0], "label": 1, "generator": s[2]})
+                        fake_count += 1
+
+                train_samples, val_samples = create_stratified_split(
+                    raw_samples,
+                    train_ratio=cfg["data"].get("train_val_ratio", 0.7),
+                    seed=cfg.get("reproducibility", {}).get("seed", 42)
+                )
+                train_ds = GenImageDataset(
+                    root_dir=dataset_root,
+                    generators=[gen_name],
+                    samples=train_samples,
+                    pre_resize_size=pre_resize,
+                    jpeg_reencode_quality=jpeg_reencode,
+                    use_mock_data=False
+                )
+                val_ds = GenImageDataset(
+                    root_dir=dataset_root,
+                    generators=[gen_name],
+                    samples=val_samples,
+                    pre_resize_size=pre_resize,
+                    jpeg_reencode_quality=jpeg_reencode,
+                    use_mock_data=False
+                )
+
+            # In case require_exact was enabled on dual-split folder
+            if require_exact and (train_exists and val_exists):
+                err_msgs = []
+                if req_real is not None and total_real_samples < req_real:
+                    err_msgs.append(f"Genuine (nature) images: {total_real_samples} available, {req_real} required (max_real_samples)")
+                if req_fake is not None and total_fake_samples < req_fake:
+                    err_msgs.append(f"AI generated images: {total_fake_samples} available, {req_fake} required (max_fake_samples)")
+                if err_msgs:
+                    raise RuntimeError(
+                        f"Experiment '{exp_id}' aborted: Insufficient samples for required dataset constraint. "
+                        f"Available: ({total_real_samples} real, {total_fake_samples} fake). "
+                        f"Required: ({req_real} real, {req_fake} fake)."
+                    )
 
     except Exception as e:
         print(f"[ERROR] Failed to load real dataset: {e}")
@@ -400,7 +467,9 @@ def run_real_data_pilot(
     }
 
     # Resolve human-readable experiment name
-    if "encoding" in exp_id.lower():
+    if "e4" in exp_id.lower() or "multi_generator" in exp_id.lower():
+        exp_display_name = f"E4 Multi-Generator (BigGAN + VQDM) Baseline"
+    elif "encoding" in exp_id.lower():
         exp_display_name = f"E2 BigGAN Resolution & Encoding Matched Sanity Baseline"
     elif "resolution" in exp_id.lower():
         exp_display_name = f"E2 BigGAN Resolution-Matched Sanity Baseline"
@@ -417,12 +486,18 @@ def run_real_data_pilot(
 
     # Log to database as experimental (Recording Best Metrics under split='val_best')
     logger = ExperimentLogger(db_path)
+    metrics_map = {gen_name: final_logged_metrics}
+    if is_multi_gen:
+        metrics_map["multi_generator"] = final_logged_metrics
+        for g in generators:
+            metrics_map[g] = final_logged_metrics
+
     logger.log_run(
         experiment_id=exp_id,
         name=exp_display_name,
         config=resolved_cfg,
         model_id=model_id,
-        metrics_by_generator={gen_name: final_logged_metrics},
+        metrics_by_generator=metrics_map,
         split="val_best",
         source_type="experimental",
         is_mock=False,
@@ -431,14 +506,15 @@ def run_real_data_pilot(
     )
 
     # Record final epoch metrics under split='val_final' to clearly distinguish best vs final
-    logger.db.insert_metrics(
-        experiment_id=exp_id,
-        generator_id=gen_name,
-        split="val_final",
-        source_type="experimental",
-        is_mock=False,
-        metrics=final_epoch_metrics
-    )
+    for g_key in metrics_map.keys():
+        logger.db.insert_metrics(
+            experiment_id=exp_id,
+            generator_id=g_key,
+            split="val_final",
+            source_type="experimental",
+            is_mock=False,
+            metrics=final_epoch_metrics
+        )
 
     print("-" * 75)
     print(f"  EXPERIMENT {exp_id.upper()}: COMPLETED")
