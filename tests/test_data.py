@@ -387,4 +387,72 @@ class TestDataModule:
         assert counts["vqdm"]["real"] == 250
         assert counts["vqdm"]["fake"] == 250
 
+    def test_e5_config_validity_and_consistency(self):
+        """Verify E5 large-data config exists and maintains exact parity with E1 hyperparameters except sample limits."""
+        import os
+        import yaml
+
+        e5_path = "configs/biggan_large_e5.yaml"
+        e1_path = "configs/biggan_constrained_baseline_e1.yaml"
+
+        assert os.path.exists(e5_path), f"E5 config file not found at {e5_path}"
+        assert os.path.exists(e1_path), f"E1 config file not found at {e1_path}"
+
+        with open(e5_path, "r") as f:
+            cfg_e5 = yaml.safe_load(f)
+        with open(e1_path, "r") as f:
+            cfg_e1 = yaml.safe_load(f)
+
+        assert cfg_e5["experiment_name"] == "biggan_large_e5"
+        assert cfg_e5["generator"] == "biggan"
+        assert cfg_e5["data"]["max_real_samples"] == 2000
+        assert cfg_e5["data"]["max_fake_samples"] == 2000
+        assert cfg_e5["data"]["train_val_ratio"] == 0.7
+        assert cfg_e5["data"]["require_exact_sample_counts"] is True
+
+        # Verify model architecture parity with E1
+        for k in ["architecture", "backbone", "pretrained", "num_classes"]:
+            assert cfg_e5["model"][k] == cfg_e1["model"][k]
+
+        # Verify preprocessing parity with E1
+        for k in ["image_size", "patch_size", "bit_planes", "normalization"]:
+            assert cfg_e5["data"][k] == cfg_e1["data"][k]
+
+        # Verify training hyperparameter parity with E1
+        for k in ["batch_size", "epochs", "learning_rate", "weight_decay", "optimizer", "mixed_precision"]:
+            assert cfg_e5["training"][k] == cfg_e1["training"][k]
+
+        # Verify reproducibility parity
+        assert cfg_e5["reproducibility"]["seed"] == 42
+        assert cfg_e5["reproducibility"]["deterministic"] is True
+
+    def test_e5_dataset_split_sample_counts(self):
+        """Verify that 4000 raw samples (2000 real, 2000 fake) split into exactly 2800 train and 1200 val with 50/50 balance."""
+        from src.data.splits import create_stratified_split
+
+        raw_samples = []
+        for i in range(2000):
+            raw_samples.append({"path": f"/fake/path/real_{i}.png", "label": 0, "generator": "biggan"})
+        for i in range(2000):
+            raw_samples.append({"path": f"/fake/path/fake_{i}.png", "label": 1, "generator": "biggan"})
+
+        assert len(raw_samples) == 4000
+
+        train_samples, val_samples = create_stratified_split(raw_samples, train_ratio=0.7, seed=42)
+
+        # Train split verification
+        assert len(train_samples) == 2800
+        train_reals = sum(1 for s in train_samples if s["label"] == 0)
+        train_fakes = sum(1 for s in train_samples if s["label"] == 1)
+        assert train_reals == 1400
+        assert train_fakes == 1400
+
+        # Val split verification
+        assert len(val_samples) == 1200
+        val_reals = sum(1 for s in val_samples if s["label"] == 0)
+        val_fakes = sum(1 for s in val_samples if s["label"] == 1)
+        assert val_reals == 600
+        assert val_fakes == 600
+
+
 

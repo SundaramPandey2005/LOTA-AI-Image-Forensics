@@ -467,7 +467,9 @@ def run_real_data_pilot(
     }
 
     # Resolve human-readable experiment name
-    if "e4" in exp_id.lower() or "multi_generator" in exp_id.lower():
+    if "e5" in exp_id.lower() or "large" in exp_id.lower():
+        exp_display_name = f"E5 BigGAN Large-Data Baseline"
+    elif "e4" in exp_id.lower() or "multi_generator" in exp_id.lower():
         exp_display_name = f"E4 Multi-Generator (BigGAN + VQDM) Baseline"
     elif "encoding" in exp_id.lower():
         exp_display_name = f"E2 BigGAN Resolution & Encoding Matched Sanity Baseline"
@@ -483,6 +485,7 @@ def run_real_data_pilot(
         exp_display_name = f"E1 BigGAN Constrained Baseline"
     else:
         exp_display_name = f"Real-Data {gen_name.upper()} {arch_name.upper()} Pilot"
+
 
     # Log to database as experimental (Recording Best Metrics under split='val_best')
     logger = ExperimentLogger(db_path)

@@ -1,0 +1,34 @@
+# E5 — BigGAN Large-Data Baseline Experiment Configuration
+experiment_name: "biggan_large_e5"
+generator: "biggan"
+
+data:
+  root_dir: "./data/GenImage"
+  use_mock_data: false
+  require_exact_sample_counts: true
+  train_val_ratio: 0.7
+  max_real_samples: 2000
+  max_fake_samples: 2000
+  image_size: 256
+  patch_size: 32
+  bit_planes: [0, 1, 2]
+  normalization: "thresholding"
+
+model:
+  architecture: "nbc"
+  backbone: "resnet50"
+  pretrained: true
+  num_classes: 1
+
+training:
+  batch_size: 16
+  epochs: 15
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  optimizer: "adam"
+  mixed_precision: true
+  checkpoint_dir: "./checkpoints"
+
+reproducibility:
+  seed: 42
+  deterministic: true

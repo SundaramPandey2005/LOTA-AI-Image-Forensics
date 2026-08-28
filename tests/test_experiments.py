@@ -531,6 +531,47 @@ class TestExperimentDatabaseAndQueries:
         assert "e4_to_vqdm" not in res
         assert len(res) == 1
 
+    def test_e5_db_logging_and_provenance(self, temp_db):
+        """Verify that E5 large-data experiment logs correctly without colliding with E1/E3/E4."""
+        _, db_path = temp_db
+        logger = ExperimentLogger(db_path)
+
+        e5_metrics = {
+            "accuracy": 0.91,
+            "auroc": 0.96,
+            "average_precision": 0.95,
+            "f1": 0.90,
+            "precision": 0.92,
+            "recall": 0.89
+        }
+
+        logger.log_run(
+            experiment_id="biggan_large_e5",
+            name="E5 BigGAN Large-Data Baseline",
+            config={"data": {"generator": "biggan", "max_real_samples": 2000, "max_fake_samples": 2000}},
+            model_id="M_NBC_RESNET50",
+            metrics_by_generator={"biggan": e5_metrics},
+            split="val_best",
+            source_type="experimental",
+            is_mock=False,
+            training_time_sec=600.0
+        )
+
+        db = ExperimentDatabase(db_path)
+        df_exp = db.query_df("SELECT * FROM experiments WHERE experiment_id = 'biggan_large_e5'")
+        assert len(df_exp) == 1
+        assert df_exp.iloc[0]["source_type"] == "experimental"
+        assert df_exp.iloc[0]["is_mock"] == 0
+        assert df_exp.iloc[0]["status"] == "COMPLETED"
+
+        df_metrics = db.query_df("SELECT * FROM metrics WHERE experiment_id = 'biggan_large_e5'")
+        assert len(df_metrics) == 1
+        assert df_metrics.iloc[0]["source_type"] == "experimental"
+        assert df_metrics.iloc[0]["is_mock"] == 0
+        assert df_metrics.iloc[0]["accuracy"] == 0.91
+        assert df_metrics.iloc[0]["auroc"] == 0.96
+
+
 
 
 
