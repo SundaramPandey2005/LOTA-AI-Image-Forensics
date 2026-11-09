@@ -27,6 +27,10 @@ def download() -> str:
     for candidate in KAGGLE_INPUT_DIRS:  # already attached to a Kaggle notebook
         if os.path.isdir(candidate):
             return candidate
+    if os.path.isdir("/kaggle/input"):  # attached under another mount point
+        attached = discover_generators("/kaggle/input", max_depth=6)
+        if attached:
+            return os.path.commonpath(list(attached.values()))
     try:
         import kagglehub
     except ImportError as error:
