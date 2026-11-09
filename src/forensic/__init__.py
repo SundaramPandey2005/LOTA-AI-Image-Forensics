@@ -1,17 +1,13 @@
-from .bitplanes import extract_bit_planes, compose_low_bit_planes
-from .normalization import normalize_noise_thresholding, normalize_noise_scaling
-from .mgps import (
-    get_directional_gradient_kernels,
-    compute_patch_divergence_scores,
-    maximum_gradient_patch_selection,
-)
+from .bitplanes import compose_low_bit_planes, extract_bit_planes
+from .lowbit import ensure_min_size, low_bit_noise_image
+from .mgps import gradient_scores, sample_candidate_patches, select_patches
 
 __all__ = [
     "extract_bit_planes",
     "compose_low_bit_planes",
-    "normalize_noise_thresholding",
-    "normalize_noise_scaling",
-    "get_directional_gradient_kernels",
-    "compute_patch_divergence_scores",
-    "maximum_gradient_patch_selection",
+    "low_bit_noise_image",
+    "ensure_min_size",
+    "gradient_scores",
+    "sample_candidate_patches",
+    "select_patches",
 ]
