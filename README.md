@@ -38,7 +38,7 @@ The two configs, [`configs/baseline_lota.yaml`](configs/baseline_lota.yaml) and 
 |---|---|
 | Python | see [`results/environment.json`](results/environment.json) |
 | PyTorch / torchvision / CUDA | see [`results/environment.json`](results/environment.json) |
-| Hardware | one NVIDIA Tesla T4 (16 GB), 4 CPU cores (Kaggle Notebooks) |
+| Hardware | one 16 GB NVIDIA GPU on Kaggle Notebooks (exact model in [`results/environment.json`](results/environment.json)) |
 
 Any Python ≥ 3.10 with PyTorch ≥ 2.0 works; a GPU with ≥ 12 GB memory is needed for the default batch size.
 
