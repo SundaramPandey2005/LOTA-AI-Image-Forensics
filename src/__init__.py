@@ -1,3 +1,3 @@
-"""LOTA: Bit-Planes Guided AI-Generated Image Detection Package."""
+"""LOTA (ICCV 2025) reproduction and the LOTA-MP multi-patch extension."""
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
