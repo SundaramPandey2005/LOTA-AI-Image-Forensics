@@ -1,0 +1,36 @@
+# Proposed: LOTA-MP (Multi-Patch Evidence Aggregation).
+# Identical to configs/baseline_lota.yaml except for model.num_patches:
+# the K = 4 highest-gradient patches share one backbone and their log-odds
+# are averaged into the image-level decision, in training and at inference.
+name: lota_mp
+seed: 0
+
+data:
+  root: ./data/GenImage
+  train_generator: sdv5
+  val_fraction: 0.1
+
+forensic:
+  bit_mode: scaling
+  num_bits: 3
+  patch_size: 32
+  num_candidates: 64
+  selection: max
+
+model:
+  backbone: resnet50
+  pretrained: true
+  num_patches: 4             # K = 4  ->  LOTA-MP  (the only change)
+  aggregation: logit_mean
+
+train:
+  epochs: 10
+  batch_size: 32             # images per step; each contributes K patches
+  lr: 1.0e-4
+  instance_loss_weight: 0.0
+  amp: true
+
+eval:
+  max_patches: 8
+  k_values: [1, 2, 4, 8]
+  batch_size: 32

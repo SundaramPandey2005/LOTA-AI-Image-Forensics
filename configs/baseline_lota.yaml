@@ -1,0 +1,35 @@
+# Reproduced baseline: LOTA with the noise-based classifier (ICCV 2025).
+# One low-bit patch per image, selected by maximum gradient score (K = 1).
+# Unlisted values fall back to src/utils/config.py::DEFAULTS.
+name: lota
+seed: 0
+
+data:
+  root: ./data/GenImage
+  train_generator: sdv5      # SD v1.5, the training subset of the paper's ablations
+  val_fraction: 0.1          # held out from train for checkpoint selection
+
+forensic:
+  bit_mode: scaling          # as in the official code release
+  num_bits: 3
+  patch_size: 32
+  num_candidates: 64
+  selection: max
+
+model:
+  backbone: resnet50         # ImageNet-pretrained
+  pretrained: true
+  num_patches: 1             # K = 1  ->  original LOTA
+  aggregation: logit_mean
+
+train:
+  epochs: 10
+  batch_size: 32
+  lr: 1.0e-4
+  instance_loss_weight: 0.0
+  amp: true
+
+eval:
+  max_patches: 8
+  k_values: [1, 2, 4, 8]
+  batch_size: 32
