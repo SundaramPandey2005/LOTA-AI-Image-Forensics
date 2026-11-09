@@ -23,8 +23,9 @@ wheels/
 .installed.cfg
 *.egg
 
-# Research papers
+# Research papers (the compiled course report under report/ is tracked)
 *.pdf
+!report/*.pdf
 
 # PyTorch checkpoints & artifacts
 *.pt
@@ -56,3 +57,9 @@ logs/
 .vscode/
 .idea/
 *.swp
+
+# Experiment outputs (curated copies live in results/)
+outputs/
+outputs_quick/
+.notebook/
+.pytest_cache/
