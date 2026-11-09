@@ -1,39 +1,19 @@
-from typing import Tuple, Optional
-import torch
+from typing import Tuple
+
 import torch.nn as nn
 import torchvision.models as models
 
+# IMAGENET1K_V1 are the weights used by the official LOTA code (resnet50-19c8e357.pth).
+_BACKBONES = {
+    "resnet50": (models.resnet50, "IMAGENET1K_V1", 2048),
+    "resnet18": (models.resnet18, "IMAGENET1K_V1", 512),
+}
 
-def get_backbone(
-    name: str = "resnet50",
-    pretrained: bool = True
-) -> Tuple[nn.Module, int]:
-    """
-    Load a torchvision backbone network.
-    
-    Args:
-        name (str): Backbone name ("resnet50", "resnet18", "resnet34", "resnet101").
-        pretrained (bool): Whether to load standard ImageNet-1k pretrained weights.
-        
-    Returns:
-        Tuple[nn.Module, int]: (backbone_module, feature_dim)
-    """
+
+def get_backbone(name: str = "resnet50", pretrained: bool = True) -> Tuple[nn.Module, int]:
+    """Return (torchvision backbone, feature dimension)."""
     name = name.lower()
-    weights = "DEFAULT" if pretrained else None
-
-    if name == "resnet50":
-        model = models.resnet50(weights=weights)
-        feat_dim = 2048
-    elif name == "resnet18":
-        model = models.resnet18(weights=weights)
-        feat_dim = 512
-    elif name == "resnet34":
-        model = models.resnet34(weights=weights)
-        feat_dim = 512
-    elif name == "resnet101":
-        model = models.resnet101(weights=weights)
-        feat_dim = 2048
-    else:
-        raise ValueError(f"Unsupported backbone: {name}")
-
-    return model, feat_dim
+    if name not in _BACKBONES:
+        raise ValueError(f"Unsupported backbone '{name}'. Choose from {sorted(_BACKBONES)}.")
+    builder, weights, feat_dim = _BACKBONES[name]
+    return builder(weights=weights if pretrained else None), feat_dim
