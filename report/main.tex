@@ -1,0 +1,232 @@
+
+\documentclass[8pt,a4paper]{article}
+
+% ------------------------------------------------
+% Packages
+% ------------------------------------------------
+\usepackage[
+    top=0.15in,
+    bottom=0.15in,
+    left=0.55in,
+    right=0.55in
+]{geometry}
+
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{makecell}
+\usepackage{caption}
+\usepackage{hyperref}
+\usepackage{titlesec}
+
+% ------------------------------------------------
+% Formatting
+% ------------------------------------------------
+
+% Black-and-white hyperlinks
+\hypersetup{
+    colorlinks=true,
+    allcolors=black
+}
+
+% Reduce line spacing
+\linespread{0.52}
+
+% Reduce paragraph spacing
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1pt}
+
+% Reduce section heading spacing
+\titlespacing*{\subsection}
+{0pt}{7pt}{3pt}
+
+% Table formatting
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.05}
+
+\captionsetup[table]{
+    font=small,
+    labelfont=bf,
+    position=top,
+    skip=3pt
+}
+
+% ------------------------------------------------
+% Result values: filled from results/summary.json (scripts/summarize_results.py)
+% ------------------------------------------------
+\newcommand{\TeamNo}{XX}
+\newcommand{\NumSeeds}{3}
+\newcommand{\BaseAcc}{--}      % LOTA, K=1: mean +- std average accuracy
+\newcommand{\BaseAP}{--}
+\newcommand{\InfAcc}{--}       % LOTA checkpoint fused over K=4 at inference only
+\newcommand{\InfAP}{--}
+\newcommand{\OursAcc}{--}      % LOTA-MP, K=4
+\newcommand{\OursAP}{--}
+\newcommand{\DeltaAcc}{--}
+\newcommand{\DeltaAP}{--}
+\newcommand{\Params}{--}       % million parameters (identical for both)
+\newcommand{\BaseLat}{--}      % ms per image, batch size 1
+\newcommand{\OursLat}{--}
+\newcommand{\DeltaLat}{--}
+
+% ------------------------------------------------
+% Document
+% ------------------------------------------------
+\begin{document}
+\thispagestyle{empty}
+
+% ------------------------------------------------
+% Title and Team Information
+% ------------------------------------------------
+\begin{center}
+
+{\large\bfseries
+LOTA-MP: Multi-Patch Evidence Aggregation for Bit-Plane Guided AI-Generated Image Detection}\\[4pt]
+
+\textbf{Team No:} \TeamNo
+\quad | \quad
+\textbf{Members:}
+Viraj Chinta (230121066), Sundaram Pandey (230107082), Aditya Bhawsar (230101006),
+Abhyuday Kashyap (230122001), Sarvagya Tiwari (230122047)\\[3pt]
+
+\textbf{GitHub:}
+\url{https://github.com/SundaramPandey2005/LOTA-AI-Image-Forensics}
+
+\end{center}
+
+\vspace{-5pt}
+
+% ------------------------------------------------
+\subsection*{I. Abstract (Maximum 100 Words)}
+% ------------------------------------------------
+\begin{enumerate}
+    \item Reconstruction-error detectors (DIRE, LaRE$^2$) need a diffusion model and multi-step sampling for every image, and generalise poorly beyond the generator family they were trained on.
+    \item They measure what a generator can re-synthesise, a generator-specific cue costing 0.26--2\,s per image; a cue intrinsic to the pixels is needed.
+    \item LOTA (ICCV 2025) uses the three lowest bit-planes, which hold only imperceptible noise: it normalises them into a noise image, keeps the $32{\times}32$ patch with maximal multi-directional gradient, and classifies it with ResNet-50.
+    \item Detection becomes a millisecond, generator-agnostic test of sensor-level statistics instead of image semantics.
+\end{enumerate}
+
+% ------------------------------------------------
+\subsection*{II. Proposed Novelty \& Technical Contribution}
+% ------------------------------------------------
+\begin{enumerate}
+    \item \textbf{LOTA-MP (Multi-Patch evidence aggregation).} LOTA decides from \emph{one} $32{\times}32$ patch, about $1.5\%$ of the image, and its own ablation (Table~5 of the paper) shows that the choice of patch moves BigGAN accuracy from $94.9\%$ to $69.9\%$. We instead keep the $K$ highest-gradient patches, score each with the same network, and fuse their log-odds into one image-level decision.
+    \item It is an algorithmic change to patch selection (arg-max $\to$ top-$K$) plus a parameter-free fusion module and a loss on the fused output. No layer or weight is added.
+    \item Baseline: $\hat y=\sigma(f_\theta(\tilde z_{p^*}))$ with $p^*=\arg\max_p g_p$. Ours: $\hat y=\sigma\big(\tfrac1K\sum_{k=1}^{K} f_\theta(\tilde z_{(k)})\big)$, where $\tilde z_{(1)},\dots,\tilde z_{(K)}$ are the patches ranked by $g_p$, and the loss is applied to the fused logit so training matches inference. $K{=}1$ recovers LOTA exactly; we use $K{=}4$.
+\end{enumerate}
+
+% ------------------------------------------------
+\subsection*{III. Theoretical / Mathematical Justification}
+% ------------------------------------------------
+\begin{enumerate}
+    \item Let $s_k=f_\theta(\tilde z_{(k)})$ be the logit of the $k$-th ranked low-bit patch and $y\in\{0,1\}$ the label ($1$ = generated). LOTA-MP uses
+    $\;\bar s=\frac1K\sum_{k=1}^{K}s_k,\quad \mathcal L=-\,y\log\sigma(\bar s)-(1-y)\log\big(1-\sigma(\bar s)\big).$
+    \item \emph{Why the mean of logits.} For patches that are conditionally independent given $y$ and balanced classes, Bayes' rule gives $\log\frac{p(y=1\mid \tilde z_{(1:K)})}{p(y=0\mid \tilde z_{(1:K)})}=\sum_k\log\frac{p(\tilde z_{(k)}\mid 1)}{p(\tilde z_{(k)}\mid 0)}$: the optimal statistic is a \emph{sum of per-patch log-odds}, whose sign equals that of $\bar s$.
+    \emph{Why it helps.} Write $s_k=\pm\mu+\varepsilon_k$ ($+$ for generated), with $\mathrm{Var}[\varepsilon_k]=\sigma^2$ and pairwise correlation $\rho$. Then $\mathbb E[\bar s]=\pm\mu$ and
+    $\mathrm{Var}[\bar s]=\sigma^2\big(\rho+\tfrac{1-\rho}{K}\big)$, so for Gaussian $\varepsilon$ the error is
+    $P_e(K)=Q\!\Big(\tfrac{\mu}{\sigma}\sqrt{\tfrac{K}{1+(K-1)\rho}}\Big)\le Q\!\big(\tfrac{\mu}{\sigma}\big)=P_e(1)$, strictly smaller whenever $\rho<1$.
+    In training, $\partial\mathcal L/\partial s_k=(\sigma(\bar s)-y)/K$: every patch receives gradient, so each image supplies $K$ patch samples per step, and since $\mathcal L$ is convex in the logit, $\mathcal L(\bar s)\le\frac1K\sum_k\mathcal L(s_k)$ (Jensen), so uninformative patches are not forced to be individually confident.
+    \item The gain is therefore tied to two measurable quantities: the single-patch margin $\mu/\sigma$ and the correlation $\rho$ between patches. It is largest where one patch is unreliable (unseen generators, small $\mu/\sigma$), bounded by $Q(\mu/(\sigma\sqrt\rho))$ as $K\to\infty$ (hence a small $K$), and zero where the baseline already saturates. The price is $K$ backbone passes per image.
+\end{enumerate}
+
+% ------------------------------------------------
+\subsection*{IV. Comparative Results \& Empirical Evaluation}
+% ------------------------------------------------
+\begin{enumerate}
+    \item Tiny-GenImage (a public subset of the paper's GenImage benchmark; 7 generators: BigGAN, Midjourney, Wukong, SD\,v1.5, ADM, GLIDE, VQDM). Both models are trained on the SD\,v1.5 training folder ($10\%$ held out for checkpoint selection) and tested on the test folders of all 7 generators. Images are used at their original resolution; the selected $32{\times}32$ patches are upsampled to $256{\times}256$. ResNet-50, Adam, lr $10^{-4}$, 10 epochs, \NumSeeds{} seeds.
+    \item Table~\ref{tab:results}: accuracy (threshold 0.5) and average precision, averaged over the 7 test generators; mean $\pm$ std over seeds. Latency is per image at batch size 1 on a Tesla T4.
+    \item LOTA-MP changes average accuracy by \DeltaAcc{} points and AP by \DeltaAP{} points with identical parameters.
+\end{enumerate}
+
+% ------------------------------------------------
+% Results Table
+% ------------------------------------------------
+\begin{center}
+
+\captionof{table}{
+Quantitative comparison of the baseline and
+proposed method on Tiny-GenImage (trained on SD\,v1.5, tested on 7 generators).
+Best results are highlighted in bold.
+}
+
+\label{tab:results}
+
+\small
+
+\begin{tabularx}{\linewidth}{
+    @{}X c c c c@{}
+}
+
+\toprule
+
+\textbf{Method}
+&
+\makecell{\textbf{Avg. ACC}\\(\% $\uparrow$)}
+&
+\makecell{\textbf{Avg. AP}\\(\% $\uparrow$)}
+&
+\makecell{\textbf{Params}\\(M)}
+&
+\makecell{\textbf{Latency}\\(ms $\downarrow$)}
+\\
+
+\midrule
+
+Baseline: LOTA (reproduced, $K{=}1$)
+&
+\BaseAcc
+&
+\BaseAP
+&
+\Params
+&
+\BaseLat
+\\
+
+LOTA + multi-patch fusion at inference only ($K{=}4$)
+&
+\InfAcc
+&
+\InfAP
+&
+\Params
+&
+\OursLat
+\\
+
+\textbf{Ours: LOTA-MP ($K{=}4$)}
+&
+\OursAcc
+&
+\OursAP
+&
+\Params
+&
+\OursLat
+\\
+
+\midrule
+
+$\Delta$ (Ours -- Baseline)
+&
+\DeltaAcc
+&
+\DeltaAP
+&
++0.0
+&
+\DeltaLat
+\\
+
+\bottomrule
+
+\end{tabularx}
+
+\end{center}
+
+\vspace{-5pt}
+
+\textbf{Result Interpretation:}
+To be written from the measured results.
+
+\end{document}
