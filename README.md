@@ -34,11 +34,13 @@ The two configs, [`configs/baseline_lota.yaml`](configs/baseline_lota.yaml) and 
 
 ## 2. Environment and dependencies
 
-| | Version used for the reported results |
+| | Version used for the reported results ([`results/environment.json`](results/environment.json)) |
 |---|---|
-| Python | see [`results/environment.json`](results/environment.json) |
-| PyTorch / torchvision / CUDA | see [`results/environment.json`](results/environment.json) |
-| Hardware | one 16 GB NVIDIA GPU on Kaggle Notebooks (exact model in [`results/environment.json`](results/environment.json)) |
+| Python | 3.13.16 |
+| PyTorch / torchvision | 2.11.0+cu130 / 0.26.0+cu130 |
+| CUDA / cuDNN | 13.0 / 9.27 |
+| NumPy | 2.1.3 |
+| Hardware | Kaggle Notebooks, one NVIDIA Tesla T4 (16 GB); the whole experiment matrix took 109 min |
 
 Any Python ≥ 3.10 with PyTorch ≥ 2.0 works; a GPU with ≥ 12 GB memory is needed for the default batch size.
 
@@ -48,7 +50,7 @@ cd LOTA-AI-Image-Forensics
 python -m venv .venv && source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121   # pick the wheel for your CUDA
 pip install -r requirements.txt
-python -m pytest -q tests                                 # 30 unit tests, < 1 min on CPU
+python -m pytest -q tests                                 # 30 unit tests, < 2 min on CPU
 ```
 
 **No local GPU?** Open [`notebooks/run_experiments.ipynb`](notebooks/run_experiments.ipynb) on Kaggle or Colab; it runs every step below end to end.
@@ -121,7 +123,59 @@ python scripts/summarize_results.py --out outputs
 
 ## 6. Checkpoints and results
 
-Results, logs and weights will be added here once the final run completes.
+Everything below comes from a single execution of [`notebooks/run_experiments.ipynb`](notebooks/run_experiments.ipynb) on Kaggle ([saved run](https://www.kaggle.com/code/abhyudaykashyap/notebookb13e5aa5af)). The complete output except the weights is committed under [`results/`](results/): per-run configs, training logs, per-generator metrics, raw per-patch logits, the latency benchmark and [`results/summary.md`](results/summary.md) with every table.
+
+**Checkpoints** (GitHub release [`v1.0`](https://github.com/SundaramPandey2005/LOTA-AI-Image-Forensics/releases/tag/v1.0), 94 MB each; load with `scripts/evaluate.py --checkpoint <file>`):
+
+| Model | Trained on | File | Config / log |
+|---|---|---|---|
+| LOTA, baseline (K = 1), seed 0 | SD v1.5 | [`lota_sdv5_s0_best.pth`](https://github.com/SundaramPandey2005/LOTA-AI-Image-Forensics/releases/download/v1.0/lota_sdv5_s0_best.pth) | [`results/runs/lota_sdv5_s0/`](results/runs/lota_sdv5_s0/) |
+| LOTA-MP, proposed (K = 4), seed 0 | SD v1.5 | [`lota_mp_sdv5_s0_best.pth`](https://github.com/SundaramPandey2005/LOTA-AI-Image-Forensics/releases/download/v1.0/lota_mp_sdv5_s0_best.pth) | [`results/runs/lota_mp_sdv5_s0/`](results/runs/lota_mp_sdv5_s0/) |
+
+### Main result: trained on SD v1.5, tested on all seven generators (3 seeds)
+
+Accuracy (%) at threshold 0.5 on the test folders; mean ± std over seeds 0, 1, 2.
+
+| Method | BigGAN | Midjourney | Wukong | SD v1.5 | ADM | GLIDE | VQDM | **Avg ACC** | Avg AP |
+|---|---|---|---|---|---|---|---|---|---|
+| LOTA (baseline, K = 1) | 63.8 ± 1.8 | 71.2 ± 1.8 | 69.2 ± 1.7 | 74.0 ± 0.8 | 63.0 ± 2.4 | 60.2 ± 3.8 | 68.0 ± 0.5 | **67.1 ± 1.7** | 76.0 ± 1.5 |
+| LOTA + fusion at inference only (K = 4) | 69.5 ± 3.0 | 79.4 ± 3.8 | 80.1 ± 2.0 | 85.1 ± 2.2 | 69.3 ± 5.4 | 60.2 ± 5.0 | 74.5 ± 2.2 | **74.0 ± 3.3** | 84.3 ± 2.3 |
+| **LOTA-MP (proposed, K = 4)** | **75.8 ± 0.7** | **90.6 ± 2.2** | **85.9 ± 1.9** | **89.7 ± 1.9** | **77.7 ± 2.1** | **73.5 ± 1.3** | **82.1 ± 2.2** | **82.2 ± 1.1** | **91.7 ± 0.8** |
+
+Δ (proposed − baseline) = **+15.1 ACC** (per seed +16.6, +16.8, +12.0) and **+15.7 AP**, with identical parameters (23.5 M) and latency (10.8 vs 10.7 ms per image on the T4, batch size 1: the K patches are batched through one backbone pass; K = 8 costs 13.6 ms). Training takes 3× longer (10.6 vs 3.6 min per run).
+
+| Second training generator: BigGAN (seed 0) | Avg ACC | Avg AP |
+|---|---|---|
+| LOTA (K = 1) | 62.3 | 68.2 |
+| LOTA-MP (K = 4) | **70.0** | **78.5** |
+
+### Ablations (trained on SD v1.5, Avg ACC over the 7 generators)
+
+| Fused patches at test time | K = 1 | K = 2 | K = 4 | K = 8 |
+|---|---|---|---|---|
+| LOTA checkpoint (trained with K = 1) | 67.1 | 70.9 | 74.0 | 76.0 |
+| LOTA-MP checkpoint (trained with K = 4) | 72.4 | 77.6 | 82.2 | 85.1 |
+
+| Fusion rule (K = 4) | log-odds mean (ours) | probability mean | majority vote |
+|---|---|---|---|
+| LOTA-MP checkpoint | **82.2** | 80.7 | 76.7 |
+
+| Unseen degradation at test time | clean | Gaussian blur σ = 1 | JPEG quality 90 |
+|---|---|---|---|
+| LOTA (K = 1) | 67.1 | 50.3 | 49.7 |
+| LOTA-MP (K = 4) | 82.2 | 54.1 | 51.0 |
+
+| Extra runs (seed 0) | Avg ACC | Avg AP |
+|---|---|---|
+| LOTA-MP + per-patch instance loss (`train.instance_loss_weight=1.0`) | 86.8 | 95.2 |
+| Baseline with bit-planes extracted *after* resizing to 256 px (the earlier version of this repo) | 56.5 | 62.1 |
+
+**How to read these numbers.**
+
+* The gain is consistent: every generator, every seed, both training generators, and it grows monotonically with K. Fusing patches only at test time recovers about half of it; training on the fused logit gives the rest and reduces the seed variance.
+* The low-bit cue does not survive blur or re-compression: both models drop to chance under unseen blur / JPEG-90, as the paper's Fig. 6 also shows for strong degradations. Aggregating patches cannot recover evidence that the degradation removed.
+* **Our baseline is far below the paper's 98.9 %.** Tiny-GenImage provides 4,000 training images per generator instead of the ~160,000 of full GenImage, and we train 10 epochs instead of 30; validation accuracy of both models was still rising at epoch 10 (see `results/runs/*/train.log`). The absolute numbers are therefore those of a low-data regime. The comparison itself is controlled (same images, splits, seeds, optimiser and schedule; only `model.num_patches` differs), and the low-data regime is where K patch samples per image are expected to matter most. Training on full GenImage would be the obvious next step.
+* The `lota_resize_first` run confirms why the earlier version of this repository reached only ~56 % cross-generator accuracy: resizing before bit extraction rewrites the low-order bits.
 
 ## 7. Code organisation and reproducibility
 
