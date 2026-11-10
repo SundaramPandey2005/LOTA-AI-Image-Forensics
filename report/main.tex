@@ -101,7 +101,7 @@ Abhyuday Kashyap (230122001), Sarvagya Tiwari (230122047)\\[3pt]
 % ------------------------------------------------
 \begin{enumerate}
     \item Reconstruction-error detectors (DIRE, LaRE$^2$) need a diffusion model and multi-step sampling for every image, and generalise poorly beyond the generator family they were trained on.
-    \item They measure what a generator can re-synthesise, a generator-specific cue costing 0.26--2\,s per image; a cue intrinsic to the pixels is needed.
+    \item They measure what a generator can re-synthesise, a generator-specific cue costing 0.26--2\,s per image.
     \item LOTA (ICCV 2025) uses the three lowest bit-planes, which hold only imperceptible noise: it normalises them into a noise image, keeps the $32{\times}32$ patch with maximal multi-directional gradient, and classifies it with ResNet-50.
     \item Detection becomes a millisecond, generator-agnostic test of sensor-level statistics instead of image semantics.
 \end{enumerate}
@@ -111,8 +111,7 @@ Abhyuday Kashyap (230122001), Sarvagya Tiwari (230122047)\\[3pt]
 % ------------------------------------------------
 \begin{enumerate}
     \item \textbf{LOTA-MP (Multi-Patch evidence aggregation).} LOTA decides from \emph{one} $32{\times}32$ patch, about $1.5\%$ of the image, and its own ablation (Table~5 of the paper) shows that the choice of patch moves BigGAN accuracy from $94.9\%$ to $69.9\%$. We instead keep the $K$ highest-gradient patches, score each with the same network, and fuse their log-odds into one image-level decision.
-    \item It is an algorithmic change to patch selection (arg-max $\to$ top-$K$) plus a parameter-free fusion module and a loss on the fused output. No layer or weight is added.
-    \item Baseline: $\hat y=\sigma(f_\theta(\tilde z_{p^*}))$ with $p^*=\arg\max_p g_p$. Ours: $\hat y=\sigma\big(\tfrac1K\sum_{k=1}^{K} f_\theta(\tilde z_{(k)})\big)$, where $\tilde z_{(1)},\dots,\tilde z_{(K)}$ are the patches ranked by $g_p$, and the loss is applied to the fused logit so training matches inference. $K{=}1$ recovers LOTA exactly; we use $K{=}4$.
+    \item Baseline: $\hat y=\sigma(f_\theta(\tilde z_{p^*}))$, $p^*=\arg\max_p g_p$. Ours: $\hat y=\sigma\big(\tfrac1K\sum_{k=1}^{K} f_\theta(\tilde z_{(k)})\big)$ over the $K$ patches ranked by $g_p$, with the loss on the fused logit so training matches inference. Patch selection changes from arg-max to top-$K$ and a parameter-free fusion is added; no layer or weight is added, $K{=}1$ recovers LOTA exactly, we use $K{=}4$.
 \end{enumerate}
 
 % ------------------------------------------------
@@ -126,14 +125,14 @@ Abhyuday Kashyap (230122001), Sarvagya Tiwari (230122047)\\[3pt]
     $\mathrm{Var}[\bar s]=\sigma^2\big(\rho+\tfrac{1-\rho}{K}\big)$, so for Gaussian $\varepsilon$ the error is
     $P_e(K)=Q\!\Big(\tfrac{\mu}{\sigma}\sqrt{\tfrac{K}{1+(K-1)\rho}}\Big)\le Q\!\big(\tfrac{\mu}{\sigma}\big)=P_e(1)$, strictly smaller whenever $\rho<1$.
     In training, $\partial\mathcal L/\partial s_k=(\sigma(\bar s)-y)/K$: every patch receives gradient, so each image supplies $K$ patch samples per step, and since $\mathcal L$ is convex in the logit, $\mathcal L(\bar s)\le\frac1K\sum_k\mathcal L(s_k)$ (Jensen), so uninformative patches are not forced to be individually confident.
-    \item The gain is therefore tied to two measurable quantities: the single-patch margin $\mu/\sigma$ and the correlation $\rho$ between patches. It is largest where one patch is unreliable (unseen generators, small $\mu/\sigma$), bounded by $Q(\mu/(\sigma\sqrt\rho))$ as $K\to\infty$ (hence a small $K$), and zero where the baseline already saturates. The price is $K$ backbone passes per image.
+    \item The gain depends on the single-patch margin $\mu/\sigma$ and the inter-patch correlation $\rho$: largest where one patch is unreliable (unseen generators), bounded by $Q(\mu/(\sigma\sqrt\rho))$ as $K\to\infty$ (hence a small $K$), zero where the baseline saturates. The price is $K$ backbone passes per image.
 \end{enumerate}
 
 % ------------------------------------------------
 \subsection*{IV. Comparative Results \& Empirical Evaluation}
 % ------------------------------------------------
 \begin{enumerate}
-    \item Tiny-GenImage, a public subset of the paper's GenImage benchmark (7 generators: BigGAN, Midjourney, Wukong, SD\,v1.5, ADM, GLIDE, VQDM; 2{,}000 real + 2{,}000 generated training and 500 + 500 test images each). Both models are trained on the SD\,v1.5 training folder ($10\%$ held out for checkpoint selection) and tested on the test folders of all 7 generators. Images are used at their original resolution; the selected $32{\times}32$ patches are upsampled to $256{\times}256$. ResNet-50, Adam, lr $10^{-4}$, 10 epochs, \NumSeeds{} seeds; same data, splits, seeds and schedule for both models, only $K$ differs.
+    \item Tiny-GenImage, a public subset of the paper's GenImage benchmark: 7 generators (BigGAN, Midjourney, Wukong, SD\,v1.5, ADM, GLIDE, VQDM), 2{,}000 + 2{,}000 training and 500 + 500 test images each. Both models are trained on SD\,v1.5 ($10\%$ held out for checkpoint selection) and tested on all 7 generators at original resolution; ResNet-50, Adam, lr $10^{-4}$, 10 epochs, \NumSeeds{} seeds, identical data, splits, seeds and schedule, only $K$ differs.
     \item Table~\ref{tab:results}: accuracy (threshold 0.5) and average precision, averaged over the 7 test generators; mean $\pm$ std over seeds. Latency is per image at batch size 1 on a Tesla T4 (Kaggle).
     \item LOTA-MP raises average accuracy by \DeltaAcc{} points (per seed $+16.6$, $+16.8$, $+12.0$) and AP by \DeltaAP{} points with identical parameters and latency. Trained on BigGAN instead: $62.3\to70.0$ ($+7.7$).
 \end{enumerate}
@@ -227,8 +226,8 @@ $\Delta$ (Ours -- Baseline)
 \vspace{-5pt}
 
 \textbf{Result Interpretation:}
-The gain appears on every test generator and is largest on unseen ones (Midjourney $+19.4$, ADM $+14.6$, VQDM $+14.1$, GLIDE $+13.2$ vs.\ $+15.7$ in-domain), as Sec.~III predicts for small single-patch margins. Fusing patches only at test time gives $+6.9$ (row~2); training on the fused logit adds another $+8.2$ and cuts the seed variance ($\pm3.3\to\pm1.1$). Accuracy grows monotonically with $K$ ($72.4/77.6/82.2/85.1$ for $K{=}1/2/4/8$) with diminishing returns, matching the $(1-\rho)/K$ variance term, and the log-odds mean beats probability averaging ($80.7$) and majority vote ($76.7$).
-\emph{Trade-offs.} Latency is unchanged because the $K$ patches are batched through one backbone pass ($K{=}8$: 13.6\,ms), but training takes $3\times$ longer (10.6 vs.\ 3.6\,min). Under unseen blur ($\sigma{=}1$) or JPEG-90 both models fall to $\approx50\%$ (MP: 54.1 on blur): the degradation erases the low-bit cue itself, and aggregation cannot recover evidence that is gone.
-\emph{Caveat.} Our baseline (67.1\%) is far below the paper's 98.9\% because Tiny-GenImage holds 4k training images per generator instead of $\sim$160k and we train 10 epochs; validation accuracy of both models was still rising at epoch 10. Absolute numbers are therefore a low-data regime, but the comparison is controlled, and this is exactly where the extra $K$ patch samples per image are expected to matter most.
+The gain holds on every generator and seed and is largest on unseen generators (Midjourney $+19.4$, ADM $+14.6$, VQDM $+14.1$), as Sec.~III predicts for small single-patch margins. Test-time fusion alone gives $+6.9$ (row~2); training on the fused logit adds $+8.2$ and cuts seed variance ($\pm3.3\to\pm1.1$). Accuracy rises monotonically with $K$ ($72.4/77.6/82.2/85.1$ for $K{=}1/2/4/8$) with diminishing returns, as the $(1-\rho)/K$ term predicts; the log-odds mean beats probability averaging ($80.7$) and voting ($76.7$).
+\emph{Trade-offs.} Latency is unchanged because the $K$ patches are batched through one backbone pass ($K{=}8$: 13.6\,ms), but training is $3\times$ slower (10.6 vs.\ 3.6\,min). Under unseen blur ($\sigma{=}1$) or JPEG-90 both models drop to $\approx50\%$: the degradation erases the low-bit cue itself, which no aggregation can recover.
+\emph{Caveat.} Our baseline (67.1\%) is far below the paper's 98.9\% because Tiny-GenImage has 4k training images per generator instead of $\sim$160k and we train 10 epochs (both models were still improving). The absolute numbers are a low-data regime; the comparison is controlled, and this regime is where $K$ patch samples per image should matter most.
 
 \end{document}
