@@ -63,3 +63,7 @@ outputs/
 outputs_quick/
 .notebook/
 .pytest_cache/
+
+# ...but the curated copy of the reported run is tracked (weights excluded)
+!results/**
+results/**/*.pth

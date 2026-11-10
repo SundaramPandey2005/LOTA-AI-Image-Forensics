@@ -1,0 +1,13 @@
+=== lota_mp | train on sdv5 | K=4 | seed=0 | device=cuda
+train images: 3600 | held-out val images: 400 | bit_mode=scaling | aggregation=logit_mean | instance_loss_weight=0.0
+epoch 01/10 lr=1.00e-04 train_loss=0.6346 val_loss=0.5348 val_acc=70.50 val_ap=80.36 time=69s *
+epoch 02/10 lr=9.10e-05 train_loss=0.5076 val_loss=0.5730 val_acc=71.25 val_ap=85.34 time=64s *
+epoch 03/10 lr=8.18e-05 train_loss=0.4392 val_loss=0.3951 val_acc=77.75 val_ap=89.67 time=64s *
+epoch 04/10 lr=7.25e-05 train_loss=0.3750 val_loss=0.3314 val_acc=81.75 val_ap=92.90 time=64s *
+epoch 05/10 lr=6.31e-05 train_loss=0.3286 val_loss=0.6086 val_acc=72.75 val_ap=87.56 time=64s
+epoch 06/10 lr=5.36e-05 train_loss=0.2998 val_loss=0.2396 val_acc=87.50 val_ap=96.62 time=64s *
+epoch 07/10 lr=4.38e-05 train_loss=0.2595 val_loss=0.2330 val_acc=87.75 val_ap=96.65 time=64s *
+epoch 08/10 lr=3.38e-05 train_loss=0.2412 val_loss=0.2430 val_acc=88.50 val_ap=96.72 time=64s *
+epoch 09/10 lr=2.35e-05 train_loss=0.2392 val_loss=0.2151 val_acc=90.00 val_ap=97.33 time=64s *
+epoch 10/10 lr=1.26e-05 train_loss=0.2147 val_loss=0.2022 val_acc=91.25 val_ap=97.38 time=64s *
+best epoch 10 (val_acc=91.25) | total train time 10.8 min | saved /kaggle/working/outputs/runs/lota_mp_sdv5_s0/best.pth

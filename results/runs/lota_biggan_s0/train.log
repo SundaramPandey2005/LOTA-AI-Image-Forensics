@@ -1,0 +1,13 @@
+=== lota | train on biggan | K=1 | seed=0 | device=cuda
+train images: 3600 | held-out val images: 400 | bit_mode=scaling | aggregation=logit_mean | instance_loss_weight=0.0
+epoch 01/10 lr=1.00e-04 train_loss=0.6493 val_loss=0.6004 val_acc=68.75 val_ap=71.01 time=72s *
+epoch 02/10 lr=9.10e-05 train_loss=0.5968 val_loss=0.5965 val_acc=66.50 val_ap=74.62 time=18s
+epoch 03/10 lr=8.18e-05 train_loss=0.5507 val_loss=0.5629 val_acc=71.25 val_ap=75.96 time=17s *
+epoch 04/10 lr=7.25e-05 train_loss=0.5243 val_loss=0.7487 val_acc=62.00 val_ap=78.89 time=17s
+epoch 05/10 lr=6.31e-05 train_loss=0.4996 val_loss=0.5510 val_acc=70.25 val_ap=78.76 time=17s
+epoch 06/10 lr=5.36e-05 train_loss=0.4736 val_loss=0.5127 val_acc=72.75 val_ap=82.05 time=17s *
+epoch 07/10 lr=4.38e-05 train_loss=0.4415 val_loss=0.5409 val_acc=73.50 val_ap=80.68 time=17s *
+epoch 08/10 lr=3.38e-05 train_loss=0.4203 val_loss=0.5277 val_acc=74.00 val_ap=81.05 time=17s *
+epoch 09/10 lr=2.35e-05 train_loss=0.3904 val_loss=0.5515 val_acc=73.25 val_ap=80.79 time=17s
+epoch 10/10 lr=1.26e-05 train_loss=0.3795 val_loss=0.5632 val_acc=72.75 val_ap=80.13 time=17s
+best epoch 8 (val_acc=74.00) | total train time 3.8 min | saved /kaggle/working/outputs/runs/lota_biggan_s0/best.pth

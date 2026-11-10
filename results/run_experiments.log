@@ -1,0 +1,224 @@
+environment: {"python": "3.13.16", "torch": "2.11.0+cu130", "torchvision": "0.26.0+cu130", "numpy": "2.1.3", "cuda": "13.0", "cudnn": 92700, "gpu": "Tesla T4", "platform": "Linux-6.18.55+-x86_64-with-glibc2.39", "command": "scripts/run_experiments.py --data-root /kaggle/input/datasets/yangsangtai/tiny-genimage --out /kaggle/working/outputs --time-budget-hours 9"}
+device=cuda | generators found: ['biggan', 'midjourney', 'wukong', 'sdv5', 'adm', 'glide', 'vqdm']
+
+######## phase: core | elapsed 0.0 min ########
+[start] train lota_sdv5_s0
+[start] eval lota_sdv5_s0 [clean]
+  [clean] biggan      n=1000  ACC: K1=62.60  K2=66.00  K4=68.40  K8=71.70  (24s)
+  [clean] midjourney  n=1000  ACC: K1=71.00  K2=75.30  K4=80.00  K8=79.00  (29s)
+  [clean] wukong      n=1000  ACC: K1=70.40  K2=75.10  K4=80.20  K8=84.30  (22s)
+  [clean] sdv5        n=1000  ACC: K1=73.40  K2=77.10  K4=85.10  K8=89.00  (21s)
+  [clean] adm         n=1000  ACC: K1=63.60  K2=68.10  K4=70.20  K8=72.90  (20s)
+  [clean] glide       n=1000  ACC: K1=59.90  K2=59.60  K4=58.70  K8=56.60  (20s)
+  [clean] vqdm        n=1000  ACC: K1=68.60  K2=72.90  K4=75.10  K8=78.90  (20s)
+  [clean] AVERAGE ACC over 7 generators: K1=67.07  K2=70.59  K4=73.96  K8=76.06
+[start] train lota_mp_sdv5_s0
+[start] eval lota_mp_sdv5_s0 [clean]
+  [clean] biggan      n=1000  ACC: K1=67.20  K2=69.90  K4=75.90  K8=79.40  (13s)
+  [clean] midjourney  n=1000  ACC: K1=80.10  K2=86.60  K4=91.80  K8=93.90  (15s)
+  [clean] wukong      n=1000  ACC: K1=74.00  K2=80.60  K4=88.20  K8=90.20  (13s)
+  [clean] sdv5        n=1000  ACC: K1=79.10  K2=86.30  K4=92.40  K8=94.80  (13s)
+  [clean] adm         n=1000  ACC: K1=69.20  K2=73.70  K4=78.60  K8=82.70  (13s)
+  [clean] glide       n=1000  ACC: K1=68.00  K2=73.10  K4=73.70  K8=76.10  (13s)
+  [clean] vqdm        n=1000  ACC: K1=73.30  K2=78.20  K4=84.80  K8=89.50  (13s)
+  [clean] AVERAGE ACC over 7 generators: K1=72.99  K2=78.34  K4=83.63  K8=86.66
+[start] train lota_sdv5_s1
+[start] eval lota_sdv5_s1 [clean]
+  [clean] biggan      n=1000  ACC: K1=62.40  K2=63.20  K4=66.60  K8=66.60  (13s)
+  [clean] midjourney  n=1000  ACC: K1=69.00  K2=73.40  K4=74.50  K8=73.50  (15s)
+  [clean] wukong      n=1000  ACC: K1=66.70  K2=72.60  K4=77.60  K8=79.60  (13s)
+  [clean] sdv5        n=1000  ACC: K1=73.50  K2=78.40  K4=82.40  K8=85.00  (13s)
+  [clean] adm         n=1000  ACC: K1=59.90  K2=64.00  K4=62.30  K8=63.40  (13s)
+  [clean] glide       n=1000  ACC: K1=55.80  K2=55.90  K4=54.90  K8=54.50  (13s)
+  [clean] vqdm        n=1000  ACC: K1=67.30  K2=68.50  K4=71.60  K8=73.50  (13s)
+  [clean] AVERAGE ACC over 7 generators: K1=64.94  K2=68.00  K4=69.99  K8=70.87
+[start] train lota_mp_sdv5_s1
+[start] eval lota_mp_sdv5_s1 [clean]
+  [clean] biggan      n=1000  ACC: K1=69.80  K2=72.10  K4=76.70  K8=78.10  (13s)
+  [clean] midjourney  n=1000  ACC: K1=80.70  K2=87.60  K4=92.50  K8=95.90  (15s)
+  [clean] wukong      n=1000  ACC: K1=73.20  K2=80.20  K4=85.80  K8=89.00  (13s)
+  [clean] sdv5        n=1000  ACC: K1=79.70  K2=83.60  K4=88.20  K8=92.40  (13s)
+  [clean] adm         n=1000  ACC: K1=67.00  K2=71.60  K4=74.80  K8=76.60  (13s)
+  [clean] glide       n=1000  ACC: K1=71.00  K2=74.20  K4=74.90  K8=76.80  (13s)
+  [clean] vqdm        n=1000  ACC: K1=72.20  K2=75.90  K4=79.40  K8=84.30  (13s)
+  [clean] AVERAGE ACC over 7 generators: K1=73.37  K2=77.89  K4=81.76  K8=84.73
+[start] train lota_sdv5_s2
+[start] eval lota_sdv5_s2 [clean]
+  [clean] biggan      n=1000  ACC: K1=66.30  K2=72.10  K4=73.60  K8=77.70  (13s)
+  [clean] midjourney  n=1000  ACC: K1=73.50  K2=78.70  K4=83.70  K8=86.40  (14s)
+  [clean] wukong      n=1000  ACC: K1=70.40  K2=76.40  K4=82.50  K8=86.10  (13s)
+  [clean] sdv5        n=1000  ACC: K1=75.20  K2=80.20  K4=87.70  K8=89.50  (13s)
+  [clean] adm         n=1000  ACC: K1=65.60  K2=70.70  K4=75.30  K8=79.10  (13s)
+  [clean] glide       n=1000  ACC: K1=65.00  K2=66.70  K4=66.90  K8=67.70  (13s)
+  [clean] vqdm        n=1000  ACC: K1=68.10  K2=73.10  K4=76.90  K8=81.90  (13s)
+  [clean] AVERAGE ACC over 7 generators: K1=69.16  K2=73.99  K4=78.09  K8=81.20
+[start] train lota_mp_sdv5_s2
+[start] eval lota_mp_sdv5_s2 [clean]
+  [clean] biggan      n=1000  ACC: K1=66.20  K2=71.20  K4=74.90  K8=78.20  (13s)
+  [clean] midjourney  n=1000  ACC: K1=76.20  K2=84.20  K4=87.50  K8=90.10  (14s)
+  [clean] wukong      n=1000  ACC: K1=72.70  K2=77.40  K4=83.60  K8=87.40  (13s)
+  [clean] sdv5        n=1000  ACC: K1=76.30  K2=82.00  K4=88.50  K8=89.50  (13s)
+  [clean] adm         n=1000  ACC: K1=68.50  K2=74.40  K4=79.60  K8=82.30  (13s)
+  [clean] glide       n=1000  ACC: K1=64.50  K2=69.80  K4=71.80  K8=73.00  (13s)
+  [clean] vqdm        n=1000  ACC: K1=72.40  K2=76.60  K4=82.20  K8=87.00  (13s)
+  [clean] AVERAGE ACC over 7 generators: K1=70.97  K2=76.51  K4=81.16  K8=83.93
+
+######## phase: latency | elapsed 53.3 min ########
+[start] latency benchmark
+  latency: {"device": "Tesla T4", "num_images": 100, "extraction_ms": 1.9049814995923953, "classification_ms": {"K1": 8.941899000092235, "K2": 8.740080999359634, "K4": 8.775731000241649, "K8": 11.715077000189922}, "total_ms": {"K1": 10.84688049968463, "K2": 10.64506249895203, "K4": 10.680712499834044, "K8": 13.620058499782317}, "params_million": 23.510081}
+
+######## phase: second | elapsed 53.4 min ########
+[start] train lota_biggan_s0
+[start] eval lota_biggan_s0 [clean]
+  [clean] biggan      n=1000  ACC: K1=70.30  K2=73.40  K4=75.50  K8=76.50  (13s)
+  [clean] midjourney  n=1000  ACC: K1=51.70  K2=52.20  K4=52.30  K8=52.70  (14s)
+  [clean] wukong      n=1000  ACC: K1=55.30  K2=58.20  K4=60.30  K8=62.70  (13s)
+  [clean] sdv5        n=1000  ACC: K1=58.90  K2=58.60  K4=61.30  K8=65.00  (13s)
+  [clean] adm         n=1000  ACC: K1=66.90  K2=70.30  K4=74.20  K8=78.10  (13s)
+  [clean] glide       n=1000  ACC: K1=67.80  K2=71.60  K4=71.30  K8=72.40  (13s)
+  [clean] vqdm        n=1000  ACC: K1=65.20  K2=68.20  K4=70.90  K8=75.00  (13s)
+  [clean] AVERAGE ACC over 7 generators: K1=62.30  K2=64.64  K4=66.54  K8=68.91
+[start] train lota_mp_biggan_s0
+[start] eval lota_mp_biggan_s0 [clean]
+  [clean] biggan      n=1000  ACC: K1=71.00  K2=74.50  K4=77.40  K8=77.60  (13s)
+  [clean] midjourney  n=1000  ACC: K1=58.30  K2=60.20  K4=62.00  K8=63.50  (15s)
+  [clean] wukong      n=1000  ACC: K1=60.00  K2=61.50  K4=61.80  K8=65.20  (13s)
+  [clean] sdv5        n=1000  ACC: K1=61.90  K2=61.60  K4=67.20  K8=68.50  (13s)
+  [clean] adm         n=1000  ACC: K1=66.00  K2=72.10  K4=75.90  K8=79.60  (13s)
+  [clean] glide       n=1000  ACC: K1=67.20  K2=71.50  K4=74.40  K8=78.10  (13s)
+  [clean] vqdm        n=1000  ACC: K1=63.60  K2=66.80  K4=71.30  K8=75.30  (13s)
+  [clean] AVERAGE ACC over 7 generators: K1=64.00  K2=66.89  K4=70.00  K8=72.54
+
+######## phase: robust | elapsed 70.9 min ########
+[start] eval lota_sdv5_s0 [jpeg90]
+  [jpeg90] biggan      n=1000  ACC: K1=49.60  K2=51.60  K4=51.50  K8=52.10  (13s)
+  [jpeg90] midjourney  n=1000  ACC: K1=45.40  K2=48.30  K4=48.60  K8=49.40  (16s)
+  [jpeg90] wukong      n=1000  ACC: K1=50.30  K2=51.40  K4=52.40  K8=51.80  (13s)
+  [jpeg90] sdv5        n=1000  ACC: K1=50.60  K2=49.40  K4=49.10  K8=50.40  (14s)
+  [jpeg90] adm         n=1000  ACC: K1=49.60  K2=49.70  K4=50.70  K8=50.20  (13s)
+  [jpeg90] glide       n=1000  ACC: K1=51.00  K2=52.80  K4=52.40  K8=51.60  (13s)
+  [jpeg90] vqdm        n=1000  ACC: K1=48.00  K2=50.50  K4=49.70  K8=50.50  (13s)
+  [jpeg90] AVERAGE ACC over 7 generators: K1=49.21  K2=50.53  K4=50.63  K8=50.86
+[start] eval lota_sdv5_s0 [blur1]
+  [blur1] biggan      n=1000  ACC: K1=47.10  K2=47.00  K4=45.80  K8=46.50  (14s)
+  [blur1] midjourney  n=1000  ACC: K1=47.40  K2=45.80  K4=42.50  K8=42.90  (25s)
+  [blur1] wukong      n=1000  ACC: K1=54.10  K2=53.60  K4=55.70  K8=57.20  (14s)
+  [blur1] sdv5        n=1000  ACC: K1=51.30  K2=52.80  K4=53.00  K8=54.50  (14s)
+  [blur1] adm         n=1000  ACC: K1=51.80  K2=48.00  K4=49.30  K8=49.00  (14s)
+  [blur1] glide       n=1000  ACC: K1=49.70  K2=48.60  K4=48.50  K8=47.90  (13s)
+  [blur1] vqdm        n=1000  ACC: K1=49.80  K2=50.20  K4=50.70  K8=52.70  (14s)
+  [blur1] AVERAGE ACC over 7 generators: K1=50.17  K2=49.43  K4=49.36  K8=50.10
+[start] eval lota_mp_sdv5_s0 [jpeg90]
+  [jpeg90] biggan      n=1000  ACC: K1=48.70  K2=49.40  K4=51.60  K8=51.60  (13s)
+  [jpeg90] midjourney  n=1000  ACC: K1=45.40  K2=47.30  K4=48.50  K8=49.00  (17s)
+  [jpeg90] wukong      n=1000  ACC: K1=48.70  K2=51.40  K4=52.70  K8=52.10  (13s)
+  [jpeg90] sdv5        n=1000  ACC: K1=50.40  K2=49.60  K4=50.30  K8=50.90  (14s)
+  [jpeg90] adm         n=1000  ACC: K1=49.00  K2=48.50  K4=50.60  K8=50.30  (14s)
+  [jpeg90] glide       n=1000  ACC: K1=50.00  K2=52.20  K4=51.80  K8=52.30  (13s)
+  [jpeg90] vqdm        n=1000  ACC: K1=50.00  K2=50.40  K4=52.00  K8=52.60  (13s)
+  [jpeg90] AVERAGE ACC over 7 generators: K1=48.89  K2=49.83  K4=51.07  K8=51.26
+[start] eval lota_mp_sdv5_s0 [blur1]
+  [blur1] biggan      n=1000  ACC: K1=46.60  K2=46.50  K4=43.30  K8=44.00  (14s)
+  [blur1] midjourney  n=1000  ACC: K1=52.90  K2=54.30  K4=55.10  K8=56.40  (24s)
+  [blur1] wukong      n=1000  ACC: K1=59.30  K2=60.10  K4=62.00  K8=63.80  (14s)
+  [blur1] sdv5        n=1000  ACC: K1=55.70  K2=58.40  K4=60.20  K8=60.10  (14s)
+  [blur1] adm         n=1000  ACC: K1=52.10  K2=53.20  K4=51.80  K8=55.50  (14s)
+  [blur1] glide       n=1000  ACC: K1=50.50  K2=50.30  K4=50.80  K8=50.60  (13s)
+  [blur1] vqdm        n=1000  ACC: K1=52.70  K2=55.70  K4=59.20  K8=61.50  (14s)
+  [blur1] AVERAGE ACC over 7 generators: K1=52.83  K2=54.07  K4=54.63  K8=55.99
+[start] eval lota_sdv5_s1 [jpeg90]
+  [jpeg90] biggan      n=1000  ACC: K1=49.30  K2=50.60  K4=51.40  K8=50.90  (13s)
+  [jpeg90] midjourney  n=1000  ACC: K1=47.10  K2=47.90  K4=49.20  K8=49.50  (17s)
+  [jpeg90] wukong      n=1000  ACC: K1=49.20  K2=50.80  K4=51.60  K8=50.70  (13s)
+  [jpeg90] sdv5        n=1000  ACC: K1=50.20  K2=49.30  K4=50.60  K8=50.30  (14s)
+  [jpeg90] adm         n=1000  ACC: K1=49.30  K2=50.00  K4=50.00  K8=49.30  (14s)
+  [jpeg90] glide       n=1000  ACC: K1=51.50  K2=51.80  K4=52.30  K8=50.40  (13s)
+  [jpeg90] vqdm        n=1000  ACC: K1=49.80  K2=50.50  K4=50.60  K8=50.50  (13s)
+  [jpeg90] AVERAGE ACC over 7 generators: K1=49.49  K2=50.13  K4=50.81  K8=50.23
+[start] eval lota_sdv5_s1 [blur1]
+  [blur1] biggan      n=1000  ACC: K1=46.10  K2=46.80  K4=46.40  K8=48.60  (14s)
+  [blur1] midjourney  n=1000  ACC: K1=46.00  K2=46.10  K4=46.70  K8=47.80  (25s)
+  [blur1] wukong      n=1000  ACC: K1=51.90  K2=53.70  K4=55.00  K8=54.10  (14s)
+  [blur1] sdv5        n=1000  ACC: K1=55.80  K2=52.60  K4=52.40  K8=54.40  (14s)
+  [blur1] adm         n=1000  ACC: K1=51.80  K2=50.10  K4=49.80  K8=49.70  (14s)
+  [blur1] glide       n=1000  ACC: K1=46.50  K2=47.40  K4=49.30  K8=50.40  (13s)
+  [blur1] vqdm        n=1000  ACC: K1=50.10  K2=51.20  K4=51.60  K8=52.70  (14s)
+  [blur1] AVERAGE ACC over 7 generators: K1=49.74  K2=49.70  K4=50.17  K8=51.10
+[start] eval lota_mp_sdv5_s1 [jpeg90]
+  [jpeg90] biggan      n=1000  ACC: K1=50.20  K2=50.20  K4=50.20  K8=50.70  (13s)
+  [jpeg90] midjourney  n=1000  ACC: K1=46.50  K2=47.00  K4=48.60  K8=49.60  (17s)
+  [jpeg90] wukong      n=1000  ACC: K1=51.50  K2=51.50  K4=52.20  K8=51.70  (13s)
+  [jpeg90] sdv5        n=1000  ACC: K1=48.80  K2=50.60  K4=50.30  K8=49.90  (13s)
+  [jpeg90] adm         n=1000  ACC: K1=51.40  K2=50.00  K4=50.10  K8=50.30  (14s)
+  [jpeg90] glide       n=1000  ACC: K1=50.60  K2=52.30  K4=52.20  K8=51.70  (13s)
+  [jpeg90] vqdm        n=1000  ACC: K1=49.30  K2=50.40  K4=51.10  K8=50.70  (13s)
+  [jpeg90] AVERAGE ACC over 7 generators: K1=49.76  K2=50.29  K4=50.67  K8=50.66
+[start] eval lota_mp_sdv5_s1 [blur1]
+  [blur1] biggan      n=1000  ACC: K1=47.10  K2=46.60  K4=43.80  K8=44.40  (14s)
+  [blur1] midjourney  n=1000  ACC: K1=58.20  K2=56.70  K4=60.00  K8=59.80  (24s)
+  [blur1] wukong      n=1000  ACC: K1=58.50  K2=57.30  K4=58.70  K8=60.80  (14s)
+  [blur1] sdv5        n=1000  ACC: K1=56.40  K2=61.10  K4=59.00  K8=64.20  (14s)
+  [blur1] adm         n=1000  ACC: K1=53.40  K2=53.90  K4=53.80  K8=54.30  (14s)
+  [blur1] glide       n=1000  ACC: K1=52.00  K2=53.10  K4=51.90  K8=49.90  (13s)
+  [blur1] vqdm        n=1000  ACC: K1=56.60  K2=56.30  K4=57.10  K8=59.90  (14s)
+  [blur1] AVERAGE ACC over 7 generators: K1=54.60  K2=55.00  K4=54.90  K8=56.19
+[start] eval lota_sdv5_s2 [jpeg90]
+  [jpeg90] biggan      n=1000  ACC: K1=51.30  K2=52.90  K4=51.50  K8=51.30  (13s)
+  [jpeg90] midjourney  n=1000  ACC: K1=44.60  K2=46.70  K4=48.80  K8=48.90  (17s)
+  [jpeg90] wukong      n=1000  ACC: K1=51.30  K2=52.20  K4=53.00  K8=53.00  (13s)
+  [jpeg90] sdv5        n=1000  ACC: K1=50.80  K2=49.90  K4=49.90  K8=50.60  (14s)
+  [jpeg90] adm         n=1000  ACC: K1=51.80  K2=51.70  K4=50.90  K8=50.10  (14s)
+  [jpeg90] glide       n=1000  ACC: K1=52.50  K2=54.40  K4=54.40  K8=53.90  (13s)
+  [jpeg90] vqdm        n=1000  ACC: K1=49.50  K2=50.90  K4=51.70  K8=50.90  (13s)
+  [jpeg90] AVERAGE ACC over 7 generators: K1=50.26  K2=51.24  K4=51.46  K8=51.24
+[start] eval lota_sdv5_s2 [blur1]
+  [blur1] biggan      n=1000  ACC: K1=45.20  K2=44.20  K4=43.30  K8=45.80  (14s)
+  [blur1] midjourney  n=1000  ACC: K1=47.70  K2=46.20  K4=43.30  K8=42.60  (25s)
+  [blur1] wukong      n=1000  ACC: K1=54.60  K2=58.20  K4=60.40  K8=61.90  (14s)
+  [blur1] sdv5        n=1000  ACC: K1=54.30  K2=54.60  K4=55.20  K8=55.80  (14s)
+  [blur1] adm         n=1000  ACC: K1=53.90  K2=53.90  K4=51.30  K8=51.10  (14s)
+  [blur1] glide       n=1000  ACC: K1=48.50  K2=49.70  K4=46.60  K8=44.70  (13s)
+  [blur1] vqdm        n=1000  ACC: K1=51.70  K2=51.50  K4=54.30  K8=55.80  (14s)
+  [blur1] AVERAGE ACC over 7 generators: K1=50.84  K2=51.19  K4=50.63  K8=51.10
+[start] eval lota_mp_sdv5_s2 [jpeg90]
+  [jpeg90] biggan      n=1000  ACC: K1=50.00  K2=51.20  K4=51.90  K8=52.90  (13s)
+  [jpeg90] midjourney  n=1000  ACC: K1=42.80  K2=44.80  K4=46.20  K8=47.50  (17s)
+  [jpeg90] wukong      n=1000  ACC: K1=51.40  K2=51.80  K4=53.80  K8=53.50  (13s)
+  [jpeg90] sdv5        n=1000  ACC: K1=49.50  K2=48.50  K4=49.50  K8=50.60  (14s)
+  [jpeg90] adm         n=1000  ACC: K1=49.80  K2=48.40  K4=49.40  K8=51.00  (13s)
+  [jpeg90] glide       n=1000  ACC: K1=52.60  K2=54.10  K4=54.20  K8=54.50  (13s)
+  [jpeg90] vqdm        n=1000  ACC: K1=49.50  K2=52.20  K4=53.00  K8=52.50  (13s)
+  [jpeg90] AVERAGE ACC over 7 generators: K1=49.37  K2=50.14  K4=51.14  K8=51.79
+[start] eval lota_mp_sdv5_s2 [blur1]
+  [blur1] biggan      n=1000  ACC: K1=45.20  K2=45.70  K4=45.10  K8=44.40  (14s)
+  [blur1] midjourney  n=1000  ACC: K1=48.90  K2=47.80  K4=50.10  K8=48.50  (25s)
+  [blur1] wukong      n=1000  ACC: K1=57.20  K2=57.70  K4=59.90  K8=61.00  (14s)
+  [blur1] sdv5        n=1000  ACC: K1=55.20  K2=57.90  K4=58.90  K8=59.60  (14s)
+  [blur1] adm         n=1000  ACC: K1=52.20  K2=51.30  K4=52.20  K8=52.30  (14s)
+  [blur1] glide       n=1000  ACC: K1=46.80  K2=44.10  K4=45.00  K8=43.10  (13s)
+  [blur1] vqdm        n=1000  ACC: K1=55.90  K2=56.50  K4=58.40  K8=59.40  (14s)
+  [blur1] AVERAGE ACC over 7 generators: K1=51.63  K2=51.57  K4=52.80  K8=52.61
+
+######## phase: ablation | elapsed 91.4 min ########
+[start] train lota_mp_inst_sdv5_s0
+[start] eval lota_mp_inst_sdv5_s0 [clean]
+  [clean] biggan      n=1000  ACC: K1=74.40  K2=75.20  K4=78.20  K8=85.50  (13s)
+  [clean] midjourney  n=1000  ACC: K1=84.60  K2=89.90  K4=93.40  K8=95.80  (14s)
+  [clean] wukong      n=1000  ACC: K1=77.90  K2=84.50  K4=90.00  K8=92.80  (13s)
+  [clean] sdv5        n=1000  ACC: K1=81.80  K2=87.00  K4=93.40  K8=95.30  (13s)
+  [clean] adm         n=1000  ACC: K1=72.20  K2=78.40  K4=83.40  K8=88.50  (13s)
+  [clean] glide       n=1000  ACC: K1=74.50  K2=78.00  K4=81.90  K8=85.60  (13s)
+  [clean] vqdm        n=1000  ACC: K1=75.80  K2=81.90  K4=87.20  K8=93.10  (13s)
+  [clean] AVERAGE ACC over 7 generators: K1=77.31  K2=82.13  K4=86.79  K8=90.94
+[start] train lota_resize_first_sdv5_s0
+[start] eval lota_resize_first_sdv5_s0 [clean]
+  [clean] biggan      n=1000  ACC: K1=56.90  K2=60.90  K4=62.10  K8=65.30  (13s)
+  [clean] midjourney  n=1000  ACC: K1=61.00  K2=64.20  K4=68.60  K8=70.70  (16s)
+  [clean] wukong      n=1000  ACC: K1=57.10  K2=57.70  K4=61.30  K8=63.40  (13s)
+  [clean] sdv5        n=1000  ACC: K1=62.20  K2=63.20  K4=67.00  K8=69.20  (13s)
+  [clean] adm         n=1000  ACC: K1=50.00  K2=51.00  K4=51.20  K8=52.00  (13s)
+  [clean] glide       n=1000  ACC: K1=57.30  K2=58.80  K4=59.10  K8=61.30  (13s)
+  [clean] vqdm        n=1000  ACC: K1=50.90  K2=52.80  K4=53.30  K8=55.20  (13s)
+  [clean] AVERAGE ACC over 7 generators: K1=56.49  K2=58.37  K4=60.37  K8=62.44
+
+all phases finished in 109.2 min. Next: python scripts/summarize_results.py --out /kaggle/working/outputs
