@@ -54,20 +54,20 @@
 % ------------------------------------------------
 % Result values: filled from results/summary.json (scripts/summarize_results.py)
 % ------------------------------------------------
-\newcommand{\TeamNo}{XX}
+\newcommand{\TeamName}{Full House}
 \newcommand{\NumSeeds}{3}
-\newcommand{\BaseAcc}{--}      % LOTA, K=1: mean +- std average accuracy
-\newcommand{\BaseAP}{--}
-\newcommand{\InfAcc}{--}       % LOTA checkpoint fused over K=4 at inference only
-\newcommand{\InfAP}{--}
-\newcommand{\OursAcc}{--}      % LOTA-MP, K=4
-\newcommand{\OursAP}{--}
-\newcommand{\DeltaAcc}{--}
-\newcommand{\DeltaAP}{--}
-\newcommand{\Params}{--}       % million parameters (identical for both)
-\newcommand{\BaseLat}{--}      % ms per image, batch size 1
-\newcommand{\OursLat}{--}
-\newcommand{\DeltaLat}{--}
+\newcommand{\BaseAcc}{67.1 $\pm$ 1.7}      % LOTA, K=1: mean +- std average accuracy
+\newcommand{\BaseAP}{76.0 $\pm$ 1.5}
+\newcommand{\InfAcc}{74.0 $\pm$ 3.3}       % LOTA checkpoint fused over K=4 at inference only
+\newcommand{\InfAP}{84.3 $\pm$ 2.3}
+\newcommand{\OursAcc}{\textbf{82.2 $\pm$ 1.1}}      % LOTA-MP, K=4
+\newcommand{\OursAP}{\textbf{91.7 $\pm$ 0.8}}
+\newcommand{\DeltaAcc}{+15.1}
+\newcommand{\DeltaAP}{+15.7}
+\newcommand{\Params}{23.5}       % million parameters (identical for both)
+\newcommand{\BaseLat}{10.8}      % ms per image, batch size 1
+\newcommand{\OursLat}{10.7}
+\newcommand{\DeltaLat}{$-$0.1}
 
 % ------------------------------------------------
 % Document
@@ -83,7 +83,7 @@
 {\large\bfseries
 LOTA-MP: Multi-Patch Evidence Aggregation for Bit-Plane Guided AI-Generated Image Detection}\\[4pt]
 
-\textbf{Team No:} \TeamNo
+\textbf{Team Name:} \TeamName
 \quad | \quad
 \textbf{Members:}
 Viraj Chinta (230121066), Sundaram Pandey (230107082), Aditya Bhawsar (230101006),
@@ -133,9 +133,9 @@ Abhyuday Kashyap (230122001), Sarvagya Tiwari (230122047)\\[3pt]
 \subsection*{IV. Comparative Results \& Empirical Evaluation}
 % ------------------------------------------------
 \begin{enumerate}
-    \item Tiny-GenImage (a public subset of the paper's GenImage benchmark; 7 generators: BigGAN, Midjourney, Wukong, SD\,v1.5, ADM, GLIDE, VQDM). Both models are trained on the SD\,v1.5 training folder ($10\%$ held out for checkpoint selection) and tested on the test folders of all 7 generators. Images are used at their original resolution; the selected $32{\times}32$ patches are upsampled to $256{\times}256$. ResNet-50, Adam, lr $10^{-4}$, 10 epochs, \NumSeeds{} seeds.
-    \item Table~\ref{tab:results}: accuracy (threshold 0.5) and average precision, averaged over the 7 test generators; mean $\pm$ std over seeds. Latency is per image at batch size 1 on a Tesla T4.
-    \item LOTA-MP changes average accuracy by \DeltaAcc{} points and AP by \DeltaAP{} points with identical parameters.
+    \item Tiny-GenImage, a public subset of the paper's GenImage benchmark (7 generators: BigGAN, Midjourney, Wukong, SD\,v1.5, ADM, GLIDE, VQDM; 2{,}000 real + 2{,}000 generated training and 500 + 500 test images each). Both models are trained on the SD\,v1.5 training folder ($10\%$ held out for checkpoint selection) and tested on the test folders of all 7 generators. Images are used at their original resolution; the selected $32{\times}32$ patches are upsampled to $256{\times}256$. ResNet-50, Adam, lr $10^{-4}$, 10 epochs, \NumSeeds{} seeds; same data, splits, seeds and schedule for both models, only $K$ differs.
+    \item Table~\ref{tab:results}: accuracy (threshold 0.5) and average precision, averaged over the 7 test generators; mean $\pm$ std over seeds. Latency is per image at batch size 1 on a Tesla T4 (Kaggle).
+    \item LOTA-MP raises average accuracy by \DeltaAcc{} points (per seed $+16.6$, $+16.8$, $+12.0$) and AP by \DeltaAP{} points with identical parameters and latency. Trained on BigGAN instead: $62.3\to70.0$ ($+7.7$).
 \end{enumerate}
 
 % ------------------------------------------------
@@ -227,6 +227,8 @@ $\Delta$ (Ours -- Baseline)
 \vspace{-5pt}
 
 \textbf{Result Interpretation:}
-To be written from the measured results.
+The gain appears on every test generator and is largest on unseen ones (Midjourney $+19.4$, ADM $+14.6$, VQDM $+14.1$, GLIDE $+13.2$ vs.\ $+15.7$ in-domain), as Sec.~III predicts for small single-patch margins. Fusing patches only at test time gives $+6.9$ (row~2); training on the fused logit adds another $+8.2$ and cuts the seed variance ($\pm3.3\to\pm1.1$). Accuracy grows monotonically with $K$ ($72.4/77.6/82.2/85.1$ for $K{=}1/2/4/8$) with diminishing returns, matching the $(1-\rho)/K$ variance term, and the log-odds mean beats probability averaging ($80.7$) and majority vote ($76.7$).
+\emph{Trade-offs.} Latency is unchanged because the $K$ patches are batched through one backbone pass ($K{=}8$: 13.6\,ms), but training takes $3\times$ longer (10.6 vs.\ 3.6\,min). Under unseen blur ($\sigma{=}1$) or JPEG-90 both models fall to $\approx50\%$ (MP: 54.1 on blur): the degradation erases the low-bit cue itself, and aggregation cannot recover evidence that is gone.
+\emph{Caveat.} Our baseline (67.1\%) is far below the paper's 98.9\% because Tiny-GenImage holds 4k training images per generator instead of $\sim$160k and we train 10 epochs; validation accuracy of both models was still rising at epoch 10. Absolute numbers are therefore a low-data regime, but the comparison is controlled, and this is exactly where the extra $K$ patch samples per image are expected to matter most.
 
 \end{document}
